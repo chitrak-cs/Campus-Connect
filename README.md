@@ -281,7 +281,7 @@ https://github.com/chitrak-cs
 LinkedIn
 
 ```
-(Add your LinkedIn)
+https://www.linkedin.com/in/chitrak-betal-a5398431a/?skipRedirect=true
 ```
 
 ---
