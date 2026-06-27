@@ -26,11 +26,13 @@ A full-stack campus collaboration platform built with <b>React</b>, <b>Node.js</
 - 👨‍🎓 Student & Faculty Accounts
 - 📚 Study Material Upload & Download
 - ☁️ Cloudinary File Storage
+- 📧 Email OTP Verification
 - 💬 Real-Time Chat (Socket.IO)
 - 👥 Study Groups
 - 📢 Announcements
 - 🛠 Admin Dashboard
 - 👤 Profile Management
+- 🚀 Fully Deployed on Vercel & Render
 - 📊 PostgreSQL Database
 
 ---
@@ -48,6 +50,29 @@ A full-stack campus collaboration platform built with <b>React</b>, <b>Node.js</
 | Styling | CSS |
 
 ---
+
+# 🏛 Architecture
+
+```
+                User
+                  │
+                  ▼
+        React + Vite (Vercel)
+                  │
+         REST API + Socket.IO
+                  │
+                  ▼
+       Express.js Backend (Render)
+          ┌────────┴────────┐
+          ▼                 ▼
+   PostgreSQL          Cloudinary
+      (Neon)           File Storage
+          │
+          ▼
+     Gmail SMTP
+     OTP Verification
+```
+
 
 # 📸 Application Screenshots
 
@@ -120,10 +145,95 @@ A full-stack campus collaboration platform built with <b>React</b>, <b>Node.js</
 # 🏗 Project Structure
 
 ```text
-backend/
-frontend/
-README-assets/
-README.md
+Campus-Connect/
+│
+├── backend/
+│   │
+│   ├── config/
+│   │   ├── cloudinary.js
+│   │   └── db.js
+│   │
+│   ├── controllers/
+│   │   ├── adminController.js
+│   │   ├── authController.js
+│   │   ├── fileController.js
+│   │   ├── groupController.js
+│   │   └── messageController.js
+│   │
+│   ├── middleware/
+│   │   └── auth.js
+│   │
+│   ├── routes/
+│   │   ├── admin.js
+│   │   ├── auth.js
+│   │   ├── files.js
+│   │   ├── groups.js
+│   │   └── messages.js
+│   │
+│   ├── node_modules/
+│   │
+│   ├── .env
+│   ├── .gitignore
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── seed.js
+│   └── server.js
+│
+├── frontend/
+│   │
+│   ├── node_modules/
+│   │
+│   ├── public/
+│   │   └── favicon.svg
+│   │
+│   ├── src/
+│   │   │
+│   │   ├── components/
+│   │   │   └── Layout.jsx
+│   │   │
+│   │   ├── context/
+│   │   │   └── AuthContext.jsx
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── AdminPage.jsx
+│   │   │   ├── ChatPage.jsx
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── FilesPage.jsx
+│   │   │   ├── GroupsPage.jsx
+│   │   │   ├── LoginPage.jsx
+│   │   │   ├── ProfilePage.jsx
+│   │   │   └── RegisterPage.jsx
+│   │   │
+│   │   ├── utils/
+│   │   │   ├── api.js
+│   │   │   ├── socket.js
+│   │   │   └── tabSession.js
+│   │   │
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   │
+│   ├── .env
+│   ├── .gitignore
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   └── vite.config.js
+│
+├── README-assets/
+│   ├── chat.png
+│   ├── create_group.png
+│   ├── dashboard.png
+│   ├── files.png
+│   ├── group.png
+│   ├── login.png
+│   ├── profile.png
+│   ├── register.png
+│   └── upload.png
+│
+├── .git/
+│
+└── README.md
 ```
 
 ---
@@ -225,6 +335,10 @@ CLIENT_URL=
 - React Context API
 - Express Middleware
 - File Upload Handling
+- Production Deployment
+- Environment Variable Management
+- Cloud Hosting (Render & Vercel)
+- SMTP Email Integration
 
 ---
 
@@ -240,31 +354,34 @@ CLIENT_URL=
 
 ---
 
-# 🌍 Deployment
+# ☁️ Deployment
 
-Frontend
+The application is fully deployed in production using modern cloud services.
 
-```
-Vercel
-```
+| Service | Platform |
+|----------|----------|
+| 🌐 Frontend Hosting | **Vercel** |
+| ⚙️ Backend Hosting | **Render** |
+| 🗄 Database | **Neon PostgreSQL** |
+| ☁️ File Storage | **Cloudinary** |
+| 📧 Email Service | **Gmail SMTP (Nodemailer)** |
 
-Backend
-
-```
-Render
-```
-
-Database
+### Deployment Architecture
 
 ```
-Neon PostgreSQL
+React (Vercel)
+       │
+       ▼
+Express + Socket.IO (Render)
+       │
+ ┌─────┴────────┐
+ ▼              ▼
+Neon DB    Cloudinary
+       │
+       ▼
+ Gmail SMTP
 ```
 
-Storage
-
-```
-Cloudinary
-```
 
 ---
 
