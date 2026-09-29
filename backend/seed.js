@@ -7,7 +7,7 @@ async function seed() {
   await initDB();
 
   // Check if admin already exists
-  const [existing] = await pool.query("SELECT id FROM users WHERE email = 'admin@Jadavpur.ac.in'");
+  const { rows: existing } = await pool.query("SELECT id FROM users WHERE email = 'admin@Jadavpur.ac.in'");
   if (existing.length) {
     console.log('✅ Admin already exists. Skipping seed.');
     process.exit(0);
@@ -17,7 +17,7 @@ async function seed() {
   const hashed = await bcrypt.hash('admin123', 12);
 
   await pool.query(
-    "INSERT INTO users (id, name, email, password, role, department) VALUES (?, ?, ?, ?, 'admin', 'Administration')",
+    "INSERT INTO users (id, name, email, password, role, department, is_verified) VALUES ($1, $2, $3, $4, 'admin', 'Administration', TRUE)",
     [adminId, 'Dr. Admin', 'admin@Jadavpur.ac.in', hashed]
   );
 
@@ -32,7 +32,7 @@ async function seed() {
     const id = uuidv4();
     const pw = await bcrypt.hash('student123', 12);
     await pool.query(
-      "INSERT IGNORE INTO users (id, name, email, password, role, department, year) VALUES (?, ?, ?, ?, 'student', ?, ?)",
+      "INSERT INTO users (id, name, email, password, role, department, year, is_verified) VALUES ($1, $2, $3, $4, 'student', $5, $6, TRUE) ON CONFLICT (email) DO NOTHING",
       [id, s.name, s.email, pw, s.dept, s.year]
     );
   }
@@ -40,7 +40,7 @@ async function seed() {
   // Demo announcement
   const annId = uuidv4();
   await pool.query(
-    "INSERT INTO announcements (id, title, content, priority, created_by) VALUES (?, ?, ?, 'high', ?)",
+    "INSERT INTO announcements (id, title, content, priority, created_by) VALUES ($1, $2, $3, 'high', $4)",
     [annId, 'Welcome to Campus Connect Platform!',
      'This platform is your central hub for study materials, campus chat, and study groups. Upload your notes and collaborate with peers!',
      adminId]

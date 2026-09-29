@@ -11,7 +11,9 @@ api.interceptors.request.use((config) => {
     const tabId = getTabId()
     const token = localStorage.getItem(tokenKey(tabId))
     if (token) config.headers.Authorization = `Bearer ${token}`
-  } catch (e) {}
+  } catch (e) {
+    console.error('Failed to get token', e);
+  }
   return config
 });
 
@@ -23,7 +25,9 @@ api.interceptors.response.use(
         const tabId = getTabId()
         localStorage.removeItem(tokenKey(tabId))
         localStorage.removeItem(`au_user_${tabId}`)
-      } catch (e) {}
+      } catch (e) {
+        console.error('Failed to remove token', e);
+      }
       window.location.href = '/login'
     }
     return Promise.reject(err);

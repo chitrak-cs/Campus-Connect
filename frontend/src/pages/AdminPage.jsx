@@ -68,7 +68,7 @@ export default function AdminPage() {
   }
   const loadPending = async () => {
     setLoading(true)
-    try { const r = await api.get('/files/pending'); setPendingFiles(r.data.files || []) } catch {}
+    try { const r = await api.get('/files/pending'); setPendingFiles(r.data.files || []) } catch (e) { console.error('Failed to load pending files', e) }
     finally { setLoading(false) }
   }
   const loadUsers = async () => {
@@ -79,11 +79,11 @@ export default function AdminPage() {
       if (roleFilter) params.role = roleFilter
       const r = await api.get('/admin/users', { params })
       setUsers(r.data.users || [])
-    } catch {}
+    } catch (e) { console.error('Failed to load users', e) }
     finally { setLoading(false) }
   }
   const loadAnnouncements = async () => {
-    try { const r = await api.get('/admin/announcements'); setAnnouncements(r.data.announcements || []) } catch {}
+    try { const r = await api.get('/admin/announcements'); setAnnouncements(r.data.announcements || []) } catch (e) { console.error('Failed to load announcements', e) }
   }
 
   const approveFile = async (id) => {
@@ -108,7 +108,7 @@ export default function AdminPage() {
     try { await api.post('/admin/announcements', annForm); toast.success('Announcement posted!'); setAnnForm({ title: '', content: '', priority: 'low' }); loadAnnouncements() } catch { toast.error('Failed') }
   }
   const deleteAnn = async (id) => {
-    try { await api.delete(`/admin/announcements/${id}`); toast.success('Deleted'); loadAnnouncements() } catch {}
+    try { await api.delete(`/admin/announcements/${id}`); toast.success('Deleted'); loadAnnouncements() } catch (e) { console.error('Failed to delete announcement', e) }
   }
   const createUser = async (e) => {
     e.preventDefault()

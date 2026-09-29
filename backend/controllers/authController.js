@@ -209,6 +209,12 @@ const login = async (req, res) => {
     if (!match)
       return res.status(401).json({ message: 'Invalid credentials' });
 
+    if (!user.is_verified) {
+      const { id: loginId, otp } = await createOtp(user.id, 'login', 10);
+      await sendOtpEmail(user.email, otp, { ttl: 10 });
+      return res.json({ otpRequired: true, loginId });
+    }
+
     const token = generateToken(user.id);
 
     delete user.password;
@@ -234,7 +240,7 @@ const verifyOtp = async (req, res) => {
     if (!result.ok)
       return res.status(400).json({ message: result.reason });
 
-    if (usePurpose === 'register') {
+    if (usePurpose === 'register' || usePurpose === 'login') {
       await pool.query(
         `UPDATE users SET is_verified = TRUE WHERE id = $1`,
         [result.userId]

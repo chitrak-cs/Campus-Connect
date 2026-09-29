@@ -65,7 +65,7 @@ export default function ChatPage() {
         const res = await api.get(url)
         setMessages(res.data.messages || [])
         scrollBottom()
-      } catch {}
+      } catch (e) { console.error('Failed to load messages', e) }
     }
     load()
   }, [activeRoom])
