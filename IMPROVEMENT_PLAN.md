@@ -44,7 +44,7 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
   1. `cd backend && node -e "console.log(require('bcryptjs').hashSync('YOUR-NEW-STRONG-PASSWORD', 12))"`
   2. In the Neon SQL editor (production branch): `UPDATE users SET password = '<hash from step 1>' WHERE role = 'admin';`
 - [ ] **H2: create a transactional email account** with an HTTPS API (recommended: **Brevo**, which can send from a verified single sender such as your Gmail without owning a domain; alternative: Resend, which needs a domain). Verify the sender address, create an API key and add it to Render as `BREVO_API_KEY` (Task C3).
-- [ ] **H3: decide on the backend region** (Task P4): move Render from Oregon to Singapore so it sits next to the database? (Recommended. It's free, but it means creating a new Render service.)
+- [x] **H3 (decided 2026-11-20: YES, move to Singapore): decide on the backend region** (Task P4): move Render from Oregon to Singapore so it sits next to the database? (Recommended. It's free, but it means creating a new Render service.)
 - [ ] **H4: approve the one-time email lower-casing UPDATE** on production (Task D2).
 - [ ] **H5: optional.** Should registration be restricted to university email domains? If yes, give the domain(s) for `ALLOWED_EMAIL_DOMAINS` (Task S9).
 - [x] **H6 (done, Vercel MCP access works):** when the agent asks, approve the Vercel team-access link (Vercel's MCP needs a per-session grant).
