@@ -3,53 +3,43 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { pool, initDB } = require('./config/db');
 
+// Local/dev only. Admin credentials come from env, never from source.
 async function seed() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('Refusing to run seed in production.');
+    process.exit(1);
+  }
+  const email = (process.env.SEED_ADMIN_EMAIL || '').trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD || '';
+  if (!email || password.length < 8) {
+    console.error('Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD (min 8 chars) in backend/.env');
+    process.exit(1);
+  }
+
   await initDB();
 
-  // Check if admin already exists
-  const { rows: existing } = await pool.query("SELECT id FROM users WHERE email = 'admin@Jadavpur.ac.in'");
+  const { rows: existing } = await pool.query('SELECT id FROM users WHERE LOWER(email) = $1', [email]);
   if (existing.length) {
     console.log('✅ Admin already exists. Skipping seed.');
     process.exit(0);
   }
 
   const adminId = uuidv4();
-  const hashed = await bcrypt.hash('admin123', 12);
-
+  const hashed = await bcrypt.hash(password, 12);
   await pool.query(
     "INSERT INTO users (id, name, email, password, role, department, is_verified) VALUES ($1, $2, $3, $4, 'admin', 'Administration', TRUE)",
-    [adminId, 'Dr. Admin', 'admin@Jadavpur.ac.in', hashed]
+    [adminId, 'Admin', email, hashed]
   );
 
-  // Demo students
-  const students = [
-    { name: 'Rahul Sharma', email: 'rahul@Jadavpur.ac.in', dept: 'CSE', year: '3rd Year' },
-    { name: 'Priya Mondal', email: 'priya@Jadavpur.ac.in', dept: 'ECE', year: '2nd Year' },
-    { name: 'Ananya Das', email: 'ananya@Jadavpur.ac.in', dept: 'CSE', year: '2nd Year' },
-  ];
-
-  for (const s of students) {
-    const id = uuidv4();
-    const pw = await bcrypt.hash('student123', 12);
-    await pool.query(
-      "INSERT INTO users (id, name, email, password, role, department, year, is_verified) VALUES ($1, $2, $3, $4, 'student', $5, $6, TRUE) ON CONFLICT (email) DO NOTHING",
-      [id, s.name, s.email, pw, s.dept, s.year]
-    );
-  }
-
-  // Demo announcement
-  const annId = uuidv4();
   await pool.query(
     "INSERT INTO announcements (id, title, content, priority, created_by) VALUES ($1, $2, $3, 'high', $4)",
-    [annId, 'Welcome to Campus Connect Platform!',
-     'This platform is your central hub for study materials, campus chat, and study groups. Upload your notes and collaborate with peers!',
+    [uuidv4(), 'Welcome to Campus Connect!',
+     'This platform is your central hub for study materials, campus chat, and study groups.',
      adminId]
   );
 
-  console.log('✅ Seed complete!');
-  console.log('   Admin:   admin@Jadavpur.ac.in / admin123');
-  console.log('   Student: rahul@Jadavpur.ac.in / student123');
+  console.log(`✅ Seed complete. Admin created: ${email}`);
   process.exit(0);
 }
 
-seed().catch(err => { console.error(err); process.exit(1); });
+seed().catch((err) => { console.error(err); process.exit(1); });

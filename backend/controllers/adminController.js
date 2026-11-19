@@ -2,35 +2,23 @@ const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 
-// ✅ GET /api/admin/stats
+// ✅ GET /api/admin/stats (single query)
 const getStats = async (req, res) => {
   try {
-    const { rows: usersRes } = await pool.query('SELECT COUNT(*)::int AS users FROM users');
-    const { rows: filesRes } = await pool.query('SELECT COUNT(*)::int AS files FROM files WHERE is_approved = TRUE');
-    const { rows: pendingRes } = await pool.query('SELECT COUNT(*)::int AS pending FROM files WHERE is_approved = FALSE');
-    const { rows: groupsRes } = await pool.query('SELECT COUNT(*)::int AS groups FROM study_groups');
-    const { rows: messagesRes } = await pool.query('SELECT COUNT(*)::int AS messages FROM messages');
-    const { rows: downloadsRes } = await pool.query('SELECT COALESCE(SUM(download_count),0)::int AS downloads FROM files');
-
-    res.json({
-      users: usersRes[0].users,
-      files: filesRes[0].files,
-      pending: pendingRes[0].pending,
-      groups: groupsRes[0].groups,
-      messages: messagesRes[0].messages,
-      downloads: downloadsRes[0].downloads
-    });
+    const { rows } = await pool.query(`
+      SELECT
+        (SELECT COUNT(*)::int FROM users) AS users,
+        (SELECT COUNT(*)::int FROM files WHERE is_approved = TRUE) AS files,
+        (SELECT COUNT(*)::int FROM files WHERE is_approved = FALSE) AS pending,
+        (SELECT COUNT(*)::int FROM study_groups) AS groups,
+        (SELECT COUNT(*)::int FROM messages) AS messages,
+        (SELECT COALESCE(SUM(download_count),0)::int FROM files) AS downloads,
+        (SELECT COUNT(*)::int FROM users WHERE requested_role IS NOT NULL) AS "pendingRoleRequests"
+    `);
+    res.json(rows[0]);
   } catch (err) {
     console.error('getStats error', err);
-    res.json({
-      users: 0,
-      files: 0,
-      pending: 0,
-      groups: 0,
-      messages: 0,
-      downloads: 0,
-      _error: err.message
-    });
+    res.status(500).json({ message: 'Error fetching stats' });
   }
 };
 
@@ -38,6 +26,8 @@ const getStats = async (req, res) => {
 const getUsers = async (req, res) => {
   try {
     const { search, role } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
     let where = [];
     let params = [];
 
@@ -55,28 +45,47 @@ const getUsers = async (req, res) => {
     const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const { rows } = await pool.query(
-      `SELECT id, name, email, role, department, year, is_active, created_at
+      `SELECT id, name, email, role, requested_role, department, year, is_active, created_at
        FROM users
        ${whereClause}
-       ORDER BY created_at DESC`,
+       ORDER BY created_at DESC
+       LIMIT ${limit} OFFSET ${(page - 1) * limit}`,
       params
     );
 
-    res.json({ users: rows });
+    res.json({ users: rows, page, limit });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error fetching users' });
   }
 };
 
+// Would removing admin power from `userId` leave the platform with no active admin?
+const isLastActiveAdmin = async (userId) => {
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM users WHERE role = 'admin' AND is_active = TRUE AND id <> $1`,
+    [userId]
+  );
+  return rows[0].n === 0;
+};
+
 // ✅ PUT /api/admin/users/:id
 const updateUser = async (req, res) => {
   try {
     const { role, is_active, department, year } = req.body;
+    const targetId = req.params.id;
 
-    const allowed = ['student', 'faculty', 'admin'];
-    if (role && !allowed.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
+    const { rows: target } = await pool.query(`SELECT id, role, is_active FROM users WHERE id = $1`, [targetId]);
+    if (!target.length) return res.status(404).json({ message: 'User not found' });
+
+    const changingRole = role !== undefined && role !== target[0].role;
+    const deactivating = is_active === false && target[0].is_active;
+
+    if (targetId === req.user.id && (changingRole || deactivating)) {
+      return res.status(400).json({ message: "You can't change your own role or deactivate yourself" });
+    }
+    if (target[0].role === 'admin' && (changingRole || deactivating) && (await isLastActiveAdmin(targetId))) {
+      return res.status(400).json({ message: "Can't demote or deactivate the last active admin" });
     }
 
     await pool.query(
@@ -84,14 +93,17 @@ const updateUser = async (req, res) => {
         role = COALESCE($1, role),
         is_active = COALESCE($2, is_active),
         department = COALESCE($3, department),
-        year = COALESCE($4, year)
-       WHERE id = $5`,
+        year = COALESCE($4, year),
+        requested_role = CASE WHEN $1 = 'faculty' THEN NULL ELSE requested_role END,
+        token_version = token_version + CASE WHEN $5 THEN 1 ELSE 0 END
+       WHERE id = $6`,
       [
-        role || null,
-        is_active !== undefined ? is_active : null,
+        role ?? null,
+        is_active ?? null,
         department || null,
         year || null,
-        req.params.id
+        deactivating,
+        targetId,
       ]
     );
 
@@ -108,9 +120,13 @@ const deleteUser = async (req, res) => {
     if (req.params.id === req.user.id) {
       return res.status(400).json({ message: "Cannot delete yourself" });
     }
+    const { rows: target } = await pool.query(`SELECT role FROM users WHERE id = $1`, [req.params.id]);
+    if (!target.length) return res.status(404).json({ message: 'User not found' });
+    if (target[0].role === 'admin' && (await isLastActiveAdmin(req.params.id))) {
+      return res.status(400).json({ message: "Can't delete the last active admin" });
+    }
 
     await pool.query('DELETE FROM users WHERE id = $1', [req.params.id]);
-
     res.json({ message: 'User deleted' });
   } catch (err) {
     console.error(err);
@@ -123,12 +139,8 @@ const createUser = async (req, res) => {
   try {
     const { name, email, password, role, department, year } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Required fields missing' });
-    }
-
     const { rows: existing } = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
+      'SELECT id FROM users WHERE LOWER(email) = $1',
       [email]
     );
 
@@ -164,10 +176,6 @@ const createUser = async (req, res) => {
 const createAnnouncement = async (req, res) => {
   try {
     const { title, content, priority } = req.body;
-
-    if (!title || !content) {
-      return res.status(400).json({ message: 'Title and content required' });
-    }
 
     const id = uuidv4();
 
@@ -217,7 +225,53 @@ const deleteAnnouncement = async (req, res) => {
   }
 };
 
+// ✅ Role requests (faculty approval)
+const getRoleRequests = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, name, email, department, year, requested_role, created_at
+       FROM users WHERE requested_role IS NOT NULL ORDER BY created_at ASC`
+    );
+    res.json({ requests: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching role requests' });
+  }
+};
+
+const approveRoleRequest = async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET role = requested_role, requested_role = NULL
+       WHERE id = $1 AND requested_role IS NOT NULL`,
+      [req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ message: 'No pending request for this user' });
+    res.json({ message: 'Role approved' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error approving request' });
+  }
+};
+
+const rejectRoleRequest = async (req, res) => {
+  try {
+    const { rowCount } = await pool.query(
+      `UPDATE users SET requested_role = NULL WHERE id = $1 AND requested_role IS NOT NULL`,
+      [req.params.id]
+    );
+    if (!rowCount) return res.status(404).json({ message: 'No pending request for this user' });
+    res.json({ message: 'Request rejected' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error rejecting request' });
+  }
+};
+
 module.exports = {
+  getRoleRequests,
+  approveRoleRequest,
+  rejectRoleRequest,
   getStats,
   getUsers,
   updateUser,

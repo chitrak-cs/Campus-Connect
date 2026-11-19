@@ -3,7 +3,7 @@ const { pool } = require('../config/db');
 // ✅ GET /api/messages/global?page=1
 const getGlobalMessages = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = 50;
     const offset = (page - 1) * limit;
 
@@ -19,8 +19,6 @@ const getGlobalMessages = async (req, res) => {
        LIMIT $1 OFFSET $2`,
       [limit, offset]
     );
-
-    console.log("📩 Global messages fetched:", rows.length); // ✅ DEBUG
 
     res.json({ messages: rows.reverse() });
   } catch (err) {
@@ -44,7 +42,7 @@ const getGroupMessages = async (req, res) => {
       return res.status(403).json({ message: 'Not a member of this group' });
     }
 
-    const page = parseInt(req.query.page) || 1;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = 50;
     const offset = (page - 1) * limit;
 

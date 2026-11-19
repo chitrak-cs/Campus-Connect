@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { pool , initDB } = require('../config/db');
-const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
+const { uploadToCloudinary, deleteFromCloudinary, cloudinary, sanitizeFilename } = require('../config/cloudinary');
 
 // ✅ POST /api/files/upload
 const uploadFile = async (req, res) => {
@@ -11,10 +11,6 @@ const uploadFile = async (req, res) => {
 
     const { title, description, file_type, department, year, subject } = req.body;
 
-    if (!title) {
-      return res.status(400).json({ message: 'Title is required' });
-    }
-
     const result = await uploadToCloudinary(req.file.buffer, req.file.originalname);
 
     const id = uuidv4();
@@ -23,11 +19,13 @@ const uploadFile = async (req, res) => {
     const file_size = `${(result.bytes / 1024 / 1024).toFixed(2)} MB`;
     const is_approved = ['admin', 'faculty'].includes(req.user.role);
 
+    try {
     await pool.query(
       `INSERT INTO files
         (id, title, description, file_url, cloudinary_public_id,
-         file_type, department, year, subject, file_size, uploaded_by, is_approved)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+         file_type, department, year, subject, file_size, uploaded_by, is_approved,
+         resource_type, original_name, mime_type, size_bytes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         id,
         title,
@@ -40,9 +38,18 @@ const uploadFile = async (req, res) => {
         subject || null,
         file_size,
         req.user.id,
-        is_approved
+        is_approved,
+        result.resource_type,
+        sanitizeFilename(req.file.originalname),
+        req.file.mimetype,
+        req.file.size
       ]
     );
+    } catch (dbErr) {
+      // Don't leave an orphan asset in Cloudinary
+      await cloudinary.uploader.destroy(cloudinary_pub, { resource_type: result.resource_type }).catch(() => {});
+      throw dbErr;
+    }
 
     const { rows } = await pool.query(
       `SELECT f.*, u.name AS uploader_name
@@ -60,14 +67,16 @@ const uploadFile = async (req, res) => {
     });
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ message: err.message || 'Error uploading file' });
+    res.status(500).json({ message: 'Error uploading file' });
   }
 };
 
 // ✅ GET /api/files
 const getFiles = async (req, res) => {
   try {
-    const { dept, year, type, search, page = 1, limit = 20 } = req.query;
+    const { dept, year, type, search } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
 
     let where = ['f.is_approved = TRUE'];
     let params = [];
@@ -93,9 +102,9 @@ const getFiles = async (req, res) => {
       where.push(`(f.title ILIKE $${params.length - 1} OR f.subject ILIKE $${params.length})`);
     }
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (page - 1) * limit;
 
-    const queryParams = [...params, parseInt(limit), offset];
+    const queryParams = [...params, limit, offset];
 
     const { rows: files } = await pool.query(
       `SELECT f.*, u.name AS uploader_name
@@ -120,7 +129,7 @@ const getFiles = async (req, res) => {
     res.json({
       files,
       total,
-      page: parseInt(page),
+      page,
       pages: Math.ceil(total / limit),
     });
   } catch (err) {

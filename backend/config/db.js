@@ -1,5 +1,6 @@
 const { Pool } = require('pg');
 require('dotenv').config();
+const crypto = require('crypto');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URI,
@@ -119,9 +120,62 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
     `);
 
+    // ── Phase 2 schema (idempotent) ──
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS requested_role TEXT CHECK (requested_role IN ('faculty')),
+        ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 0;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS otps (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL,
+        code VARCHAR(10),
+        purpose VARCHAR(32) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`ALTER TABLE otps ALTER COLUMN code DROP NOT NULL;`);
+    await client.query(`
+      ALTER TABLE otps
+        ADD COLUMN IF NOT EXISTS code_hash TEXT,
+        ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0;
+    `);
+
+    await client.query(`
+      ALTER TABLE study_groups
+        ADD COLUMN IF NOT EXISTS invite_code VARCHAR(12) UNIQUE;
+    `);
+    // Backfill invite codes for existing private groups
+    const { rows: noCode } = await client.query(
+      `SELECT id FROM study_groups WHERE is_private AND invite_code IS NULL`
+    );
+    for (const g of noCode) {
+      await client.query(`UPDATE study_groups SET invite_code=$1 WHERE id=$2`, [
+        crypto.randomBytes(6).toString('base64url').slice(0, 8),
+        g.id,
+      ]);
+    }
+
+    await client.query(`
+      ALTER TABLE files
+        ADD COLUMN IF NOT EXISTS resource_type TEXT,
+        ADD COLUMN IF NOT EXISTS original_name TEXT,
+        ADD COLUMN IF NOT EXISTS mime_type TEXT,
+        ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
+    `);
   } finally {
     client.release();
   }
 };
 
-module.exports = { pool, initDB };
+// Remove stale OTPs (run on boot and hourly)
+const cleanupOtps = () =>
+  pool
+    .query(`DELETE FROM otps WHERE created_at < NOW() - INTERVAL '1 day'`)
+    .catch((e) => console.error('OTP cleanup failed:', e.message));
+
+module.exports = { pool, initDB, cleanupOtps };
