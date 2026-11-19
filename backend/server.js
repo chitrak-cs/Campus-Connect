@@ -18,6 +18,7 @@ const fileRoutes = require('./routes/files');
 const groupRoutes = require('./routes/groups');
 const adminRoutes = require('./routes/admin');
 const messageRoutes = require('./routes/messages');
+const publicRoutes = require('./routes/public');
 
 const app = express();
 const server = http.createServer(app);
@@ -229,6 +230,7 @@ app.use('/api/files', fileRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/messages', messageRoutes);
+app.use('/api/public', publicRoutes);
 
 app.get('/api/announcements', protect, async (req, res) => {
   try {

@@ -8,6 +8,7 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => { removeLegacyKeys(); return getStoredUser(); });
   const [loading, setLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -33,6 +34,8 @@ export const AuthProvider = ({ children }) => {
     }
     const { token, user } = res.data;
     saveAuth(token, user);
+    setSessionExpired(false);
+    setSessionExpired(false);
     setUser(user);
     connectSocket(token);
     return user;
@@ -43,6 +46,7 @@ export const AuthProvider = ({ children }) => {
     const res = await api.post('/auth/verify-otp', { id: loginId, code });
     const { token, user } = res.data;
     saveAuth(token, user);
+    setSessionExpired(false);
     setUser(user);
     connectSocket(token);
     return user;
@@ -54,6 +58,7 @@ export const AuthProvider = ({ children }) => {
     if (res.data && res.data.otpRequired) return res.data;
     const { token, user } = res.data;
     saveAuth(token, user);
+    setSessionExpired(false);
     setUser(user);
     connectSocket(token);
     return user;
@@ -70,6 +75,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const onForcedLogout = () => {
+      setSessionExpired(true);
       setUser(null);
       disconnectSocket();
     };
@@ -90,7 +96,7 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, verifyOtp, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, sessionExpired, login, verifyOtp, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

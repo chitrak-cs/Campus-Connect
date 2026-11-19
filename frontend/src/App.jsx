@@ -1,6 +1,8 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
+import { Spinner } from './components/ui'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import Dashboard from './pages/Dashboard'
@@ -9,36 +11,53 @@ import ChatPage from './pages/ChatPage'
 import GroupsPage from './pages/GroupsPage'
 import AdminPage from './pages/AdminPage'
 import ProfilePage from './pages/ProfilePage'
+import NotFoundPage from './pages/NotFoundPage'
 
-const ProtectedRoute = ({ children, adminOnly }) => {
-  const { user, loading } = useAuth()
-  if (loading) return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0B1F3A' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div className="spinner gold" style={{ width: 36, height: 36, margin: '0 auto 16px' }} />
-        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Loading Campus Connect...</div>
-      </div>
+const Splash = () => (
+  <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg)' }}>
+    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+      <Spinner size="lg" label="Loading Campus Connect" />
+      <p style={{ marginTop: 12 }}>Loading Campus Connect…</p>
     </div>
-  )
-  if (!user) return <Navigate to="/login" replace />
-  if (adminOnly && user.role !== 'admin') return <Navigate to="/" replace />
-  return children
+  </div>
+)
+
+// Logged in: the app shell. Logged out: landing page at "/", otherwise sign in.
+const Gate = () => {
+  const { user, loading, sessionExpired } = useAuth()
+  const { pathname } = useLocation()
+  if (loading) return <Splash />
+  if (user) return <Layout />
+  if (pathname === '/') return <LandingPage />
+  return <Navigate to={sessionExpired ? '/login?expired=1' : '/login'} replace />
+}
+
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth()
+  return user?.role === 'admin' ? children : <Navigate to="/" replace />
+}
+
+// Signed-in users have no reason to see the auth pages
+const GuestRoute = ({ children }) => {
+  const { user, loading } = useAuth()
+  if (loading) return <Splash />
+  return user ? <Navigate to="/" replace /> : children
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+      <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+      <Route path="/" element={<Gate />}>
         <Route index element={<Dashboard />} />
         <Route path="files" element={<FilesPage />} />
         <Route path="chat" element={<ChatPage />} />
         <Route path="groups" element={<GroupsPage />} />
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
+        <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }

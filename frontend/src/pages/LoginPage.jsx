@@ -1,118 +1,86 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { BookOpen, Eye, EyeOff } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import api from '../utils/api'
+import AuthShell from '../components/AuthShell'
+import OtpStep from '../components/OtpStep'
+import PasswordInput from '../components/PasswordInput'
+import { Input, Button } from '../components/ui'
 
 export default function LoginPage() {
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [showPw, setShowPw] = useState(false)
-  const [loading, setLoading] = useState(false)
   const { login, verifyOtp } = useAuth()
   const navigate = useNavigate()
-  const [otpStage, setOtpStage] = useState(false)
+  const [params] = useSearchParams()
+  const [form, setForm] = useState({ email: '', password: '' })
+  const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
   const [loginId, setLoginId] = useState(null)
   const [code, setCode] = useState('')
 
-  const handle = async (e) => {
+  useEffect(() => { document.title = 'Sign in · Campus Connect' }, [])
+
+  const handleLogin = async (e) => {
     e.preventDefault()
     setLoading(true)
     try {
-      const res = await login(form.email, form.password)
-      if (res && res.otpRequired) {
-        setLoginId(res.loginId)
-        setOtpStage(true)
-        toast('OTP sent to your email — enter it below')
-      } else {
-        toast.success('Welcome back!')
-        navigate('/')
-      }
+      const res = await login(form.email.trim(), form.password)
+      if (res?.otpRequired) { setLoginId(res.loginId); setCode(''); toast('Verification code sent to your email'); return }
+      toast.success('Welcome back!')
+      navigate('/')
     } catch (err) {
       toast.error(err.response?.data?.message || 'Login failed')
     } finally { setLoading(false) }
   }
 
-  const handleVerify = async (e) => {
-    e.preventDefault()
-    if (!loginId) return toast.error('Missing login session')
+  const handleVerify = async (value) => {
+    if (loading || !loginId) return
     setLoading(true)
     try {
-      await verifyOtp(loginId, code)
-      toast.success('Verified — welcome!')
+      await verifyOtp(loginId, value)
+      toast.success('Verified. Welcome!')
       navigate('/')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'OTP verification failed')
+      toast.error(err.response?.data?.message || 'Verification failed')
+      setCode('')
     } finally { setLoading(false) }
   }
 
+  const handleResend = async () => {
+    setResending(true)
+    try {
+      const res = await api.post('/auth/resend-otp', { id: loginId })
+      setLoginId(res.data.id); setCode(''); toast.success('New code sent')
+      return true
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not resend code')
+      return false
+    } finally { setResending(false) }
+  }
+
   return (
-    <div className="auth-wrap">
-      <div className="auth-left">
-        <div className="auth-decoration" />
-        <div className="auth-decoration" style={{ width: 600, height: 600, top: -200, right: -200, borderColor: 'rgba(201,168,76,0.08)' }} />
-        <div className="auth-left-inner">
-          <div className="auth-hero-top">
-            <div className="auth-hero-logo"><BookOpen size={24} color="#0B1F3A" /></div>
-            <div>
-              <div className="auth-logo" style={{ fontSize: 22, margin: 0 }}>Campus Connect</div>
-              <div style={{ color: 'var(--gold)', fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Learning Platform</div>
-            </div>
+    <AuthShell headline={<>Your campus,<br />in one place.</>}>
+      {loginId ? (
+        <OtpStep email={form.email} code={code} setCode={setCode} onVerify={handleVerify} onResend={handleResend}
+          onBack={() => { setLoginId(null); setCode('') }} loading={loading} resending={resending} />
+      ) : (
+        <form className="auth__form" onSubmit={handleLogin} noValidate={false}>
+          <div>
+            <h1 className="auth__title font-display">Sign in</h1>
+            <p className="auth__lead">Welcome back. Enter your details to continue.</p>
           </div>
-
-          <h1 className="hero-title">Your knowledge<br />hub awaits.</h1>
-          <p className="hero-sub">Access lecture notes, exam papers, study groups, and real-time campus chat — all in one place.</p>
-        </div>
-      </div>
-
-        <div className="auth-right">
-        <form className="auth-form form-card" onSubmit={otpStage ? handleVerify : handle}>
-          <h2>Sign In</h2>
-          <p className="form-note">Use your university email to continue</p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input className="form-input" type="email" placeholder="you@Jadavpur.ac.in"
-                value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
-            </div>
-            {!otpStage ? (
-              <div className="form-group">
-                <label className="form-label">Password</label>
-                <div style={{ position: 'relative' }}>
-                  <input className="form-input" type={showPw ? 'text' : 'password'} placeholder="••••••••"
-                    style={{ paddingRight: 44 }}
-                    value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} required />
-                  <button type="button" onClick={() => setShowPw(v => !v)}
-                    style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer' }}>
-                    {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="form-group">
-                <label className="form-label">One-Time Code</label>
-                <input className="form-input" value={code} onChange={e => setCode(e.target.value)} placeholder="123456" />
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button className="btn btn-outline btn-sm" type="button" onClick={() => { setOtpStage(false); setCode('') }}>Back</button>
-                  <button className="btn btn-primary btn-sm" type="submit" disabled={loading || !code}>Verify</button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {!otpStage && (
-            <button type="submit" className="btn btn-primary" disabled={loading}
-              style={{ width: '100%', marginTop: 24, padding: '12px', justifyContent: 'center', fontSize: 15 }}>
-              {loading ? <span className="spinner" style={{ width: 18, height: 18 }} /> : 'Sign In'}
-            </button>
+          {params.get('expired') && (
+            <div className="auth__banner auth__banner--warn" role="status"><Clock size={16} aria-hidden="true" /> Your session expired. Please sign in again.</div>
           )}
-
-          <p style={{ textAlign: 'center', marginTop: 20, fontSize: 14, color: 'var(--gray-500)' }}>
-            No account?{' '}
-            <Link to="/register" style={{ color: 'var(--navy)', fontWeight: 600 }}>Register here</Link>
-          </p>
+          <Input label="Email address" type="email" autoComplete="email" placeholder="you@university.ac.in" required
+            value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+          <PasswordInput autoComplete="current-password" placeholder="Your password" required
+            value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+          <Button type="submit" size="lg" block loading={loading}>Sign in</Button>
+          <p className="auth__alt">No account yet? <Link to="/register">Create one</Link></p>
         </form>
-      </div>
-    </div>
+      )}
+    </AuthShell>
   )
 }
