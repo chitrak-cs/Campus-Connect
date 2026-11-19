@@ -47,7 +47,7 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 - [ ] **H3: decide on the backend region** (Task P4): move Render from Oregon to Singapore so it sits next to the database? (Recommended. It's free, but it means creating a new Render service.)
 - [ ] **H4: approve the one-time email lower-casing UPDATE** on production (Task D2).
 - [ ] **H5: optional.** Should registration be restricted to university email domains? If yes, give the domain(s) for `ALLOWED_EMAIL_DOMAINS` (Task S9).
-- [ ] **H6:** when the agent asks, approve the Vercel team-access link (Vercel's MCP needs a per-session grant).
+- [x] **H6 (done, Vercel MCP access works):** when the agent asks, approve the Vercel team-access link (Vercel's MCP needs a per-session grant).
 
 ---
 
@@ -500,6 +500,8 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | 3.13 | Not done: `ConfirmDialog` is built in 5.2. Do this when 5.2 lands. |
 | 2026-11-20 | 3.5 | Backend endpoint done; the "My uploads" UI is F5/5.8. |
 | 2026-11-20 | H1 | Confirmed `admin123` DID work on the live site (anyone could be admin). Production admin password changed by the owner's request (new value kept only in the gitignored `backend/.env`; never in the repo or UI). Old password verified rejected, new one accepted. The production DB has no `token_version` column yet, so tokens issued with the old password stay valid until JWT expiry (7d) or until the Phase 9 deploy adds token versioning. |
+| 2026-11-20 | H4/D2 | Pre-check on production: 13 users, no case-insensitive duplicates; 4 rows would change (admin + 3 demo students). The UPDATE itself is deliberately NOT run yet: the live (old) backend does case-sensitive email lookup, so lower-casing now would break admin login until the new backend is deployed. Run it at 9.5 right before the merge. |
+| 2026-11-20 | H2 | No Brevo/Sendinblue mail found in Gmail, so no account exists. Signup (password, CAPTCHA, email code) must be done by the owner. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
