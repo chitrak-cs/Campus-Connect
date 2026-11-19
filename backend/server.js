@@ -62,11 +62,12 @@ io.use(async (socket, next) => {
 // Presence: user can have several sockets (tabs); offline only when the last one closes
 const presence = new Map(); // userId -> { user, sockets:Set }
 let presenceTimer = null;
+const onlineList = () => Array.from(presence.values()).map((v) => v.user);
 const broadcastPresence = () => {
   if (presenceTimer) return;
   presenceTimer = setTimeout(() => {
     presenceTimer = null;
-    io.emit('online_users', Array.from(presence.values()).map((v) => v.user));
+    io.emit('online_users', onlineList());
   }, 1000);
 };
 
@@ -84,7 +85,7 @@ const makeBucket = () => {
   };
 };
 
-io.on('connection', async (socket) => {
+io.on('connection', (socket) => {
   const user = socket.user;
   const allow = makeBucket();
   let warned = false;
@@ -93,17 +94,18 @@ io.on('connection', async (socket) => {
   entry.sockets.add(socket.id);
   presence.set(user.id, entry);
   broadcastPresence();
+  socket.emit('online_users', onlineList()); // late joiners get the list immediately
+  socket.on('get_online_users', () => socket.emit('online_users', onlineList()));
 
   socket.join('global');
   socket.join(`user:${user.id}`);
 
-  // The ONLY way a socket enters group rooms: server-side membership lookup
-  try {
-    const { rows } = await pool.query(`SELECT group_id FROM group_members WHERE user_id = $1`, [user.id]);
-    rows.forEach((r) => socket.join(`group:${r.group_id}`));
-  } catch (err) {
-    console.error('Failed to load group rooms:', err.message);
-  }
+  // The ONLY way a socket enters group rooms: server-side membership lookup.
+  // Handlers below are registered synchronously; group handlers await this promise.
+  const roomsReady = pool
+    .query(`SELECT group_id FROM group_members WHERE user_id = $1`, [user.id])
+    .then(({ rows }) => rows.forEach((r) => socket.join(`group:${r.group_id}`)))
+    .catch((err) => console.error('Failed to load group rooms:', err.message));
 
   // Deprecated: clients can no longer pick rooms
   socket.on('join_groups', () => {});
@@ -152,6 +154,7 @@ io.on('connection', async (socket) => {
       if (!parsed.success || !gid.success || throttled()) return;
       const group_id = gid.data;
 
+      await roomsReady;
       // Must be in the room (set up server-side) AND still a member in the DB
       if (!socket.rooms.has(`group:${group_id}`)) return;
       const { rows: membership } = await pool.query(
@@ -190,7 +193,8 @@ io.on('connection', async (socket) => {
     socket.to('global').emit('user_typing', { name: user.name, room: 'global' });
   });
 
-  socket.on('typing_group', (payload) => {
+  socket.on('typing_group', async (payload) => {
+    await roomsReady;
     const gid = uuidSchema.safeParse(payload?.group_id);
     if (!gid.success || !socket.rooms.has(`group:${gid.data}`)) return;
     socket.to(`group:${gid.data}`).emit('user_typing', { name: user.name, room: gid.data });

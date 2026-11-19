@@ -6,6 +6,7 @@ import {
   ShieldCheck, User, LogOut, Menu, X, BookOpen, Bell
 } from 'lucide-react'
 import { getSocket } from '../utils/socket'
+import { getActiveChatRoom } from '../utils/chatState'
 import api from '../utils/api'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -32,6 +33,11 @@ export default function Layout() {
   const [notifications, setNotifications] = useState([])
   const [unread, setUnread] = useState(0)
   const notRef = useRef()
+  const pathRef = useRef(location.pathname)
+  pathRef.current = location.pathname
+  const meRef = useRef(user?.id)
+  meRef.current = user?.id
+  const roomOpen = (room) => pathRef.current === '/chat' && getActiveChatRoom() === room
 
   const isActive = (path) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path)
 
@@ -58,7 +64,7 @@ export default function Layout() {
         type: 'announcement',
         title: a.title,
         body: a.content,
-        url: '/admin',
+        url: '/',
         ts: new Date(a.created_at).toISOString(),
         read: false,
       }))
@@ -72,6 +78,7 @@ export default function Layout() {
     if (!socket) return () => { mounted = false }
 
     const onGlobal = (msg) => {
+      if (msg.sender_id === meRef.current || roomOpen('global')) return
       const n = {
         id: `gmsg-${msg.id}-${Date.now()}`,
         type: 'message',
@@ -85,12 +92,14 @@ export default function Layout() {
     }
 
     const onGroup = (msg) => {
+      if (msg.sender_id === meRef.current || roomOpen(msg.group_id)) return
       const n = {
         id: `g-${msg.id}-${Date.now()}`,
         type: 'group_message',
-        title: `New message in ${msg.group_name}`,
+        title: `New message in ${msg.group_name || 'a group'}`,
         body: msg.content.slice(0,120),
         url: `/chat`,
+        state: { groupId: msg.group_id },
         ts: new Date(msg.created_at).toISOString(),
         read: false,
       }
@@ -126,7 +135,7 @@ export default function Layout() {
   }
 
   const goToNotification = (n) => {
-    if (n.url) navigate(n.url)
+    if (n.url) navigate(n.url, n.state ? { state: n.state } : undefined)
     setNotifOpen(false)
   }
 

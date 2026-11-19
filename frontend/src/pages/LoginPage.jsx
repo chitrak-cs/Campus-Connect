@@ -61,15 +61,6 @@ export default function LoginPage() {
 
           <h1 className="hero-title">Your knowledge<br />hub awaits.</h1>
           <p className="hero-sub">Access lecture notes, exam papers, study groups, and real-time campus chat — all in one place.</p>
-
-          <div className="hero-stats">
-            {[['500+', 'Study Materials'], ['2000+', 'Active Students'], ['50+', 'Study Groups']].map(([n, l]) => (
-              <div key={l}>
-                <div className="hero-stat">{n}</div>
-                <div className="hero-stat-label">{l}</div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 

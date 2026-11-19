@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { getSocket } from '../utils/socket'
+import { setActiveChatRoom } from '../utils/chatState'
 import api from '../utils/api'
 import { Send, Hash, Users, Wifi, WifiOff } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
@@ -75,40 +76,59 @@ export default function ChatPage() {
     api.get('/groups').then(res => setGroups(res.data.groups || []))
   }, [])
 
-  // Socket setup
+  // Keep the latest room in a ref so listeners don't need re-registering on every switch
+  const activeRoomRef = useRef(activeRoom)
+  useEffect(() => {
+    activeRoomRef.current = activeRoom
+    setActiveChatRoom(activeRoom)
+    setTyping(null)
+  }, [activeRoom])
+  useEffect(() => () => setActiveChatRoom(null), [])
+
+  // Connection status + presence
   useEffect(() => {
     if (!socket) return
+    const onConnect = () => setConnected(true)
+    const onDisconnect = () => setConnected(false)
+    const onOnline = (users) => setOnlineUsers(users)
     setConnected(socket.connected)
-    socket.on('connect', () => setConnected(true))
-    socket.on('disconnect', () => setConnected(false))
-    socket.on('online_users', (users) => setOnlineUsers(users))
+    socket.emit('get_online_users')
+    socket.on('connect', onConnect)
+    socket.on('disconnect', onDisconnect)
+    socket.on('online_users', onOnline)
+    return () => {
+      socket.off('connect', onConnect)
+      socket.off('disconnect', onDisconnect)
+      socket.off('online_users', onOnline)
+    }
+  }, [socket])
 
-    socket.on('new_global_message', (msg) => {
-      if (activeRoom === 'global') {
-        setMessages(prev => [...prev, msg])
-        scrollBottom()
-      }
-    })
-    socket.on('new_group_message', (msg) => {
-      if (activeRoom === msg.group_id) {
-        setMessages(prev => [...prev, msg])
-        scrollBottom()
-      }
-    })
-    socket.on('user_typing', ({ name, room }) => {
-      const target = room === 'global' ? 'global' : room
-      if (target === activeRoom) {
+  // Message + typing listeners (named handlers: never removes Layout's notification listeners)
+  useEffect(() => {
+    if (!socket) return
+    const onGlobal = (msg) => {
+      if (activeRoomRef.current === 'global') { setMessages(prev => [...prev, msg]); scrollBottom() }
+    }
+    const onGroup = (msg) => {
+      if (activeRoomRef.current === msg.group_id) { setMessages(prev => [...prev, msg]); scrollBottom() }
+    }
+    const onTyping = ({ name, room }) => {
+      if (room === activeRoomRef.current) {
         setTyping(name)
         clearTimeout(typingTimer.current)
         typingTimer.current = setTimeout(() => setTyping(null), 2500)
       }
-    })
-
-    return () => {
-      socket.off('connect'); socket.off('disconnect'); socket.off('online_users')
-      socket.off('new_global_message'); socket.off('new_group_message'); socket.off('user_typing')
     }
-  }, [socket, activeRoom, groups])
+    socket.on('new_global_message', onGlobal)
+    socket.on('new_group_message', onGroup)
+    socket.on('user_typing', onTyping)
+    return () => {
+      socket.off('new_global_message', onGlobal)
+      socket.off('new_group_message', onGroup)
+      socket.off('user_typing', onTyping)
+      clearTimeout(typingTimer.current)
+    }
+  }, [socket])
 
   const sendMessage = useCallback(() => {
     if (!input.trim() || !socket) return

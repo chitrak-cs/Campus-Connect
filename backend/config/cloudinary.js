@@ -62,15 +62,18 @@ const uploadToCloudinary = (buffer, originalName) => {
 };
 
 /**
- * Delete a file from Cloudinary.
- * resource_type must match what was used during upload.
+ * Delete an asset. Pass the stored resource_type when known. Legacy rows have none:
+ * raw public ids keep their extension, image ids don't, so guess the order and try both.
  */
-const deleteFromCloudinary = async (publicId, originalName = '') => {
-  const ext   = (originalName || publicId).split('.').pop().toLowerCase();
-  const isRaw = ['pdf', 'doc', 'docx', 'ppt', 'pptx'].includes(ext);
-  return cloudinary.uploader.destroy(publicId, {
-    resource_type: isRaw ? 'raw' : 'image',
-  });
+const deleteFromCloudinary = async (publicId, resourceType) => {
+  const guess = /\.[a-z0-9]{2,5}$/i.test(publicId) ? ['raw', 'image'] : ['image', 'raw'];
+  const types = resourceType ? [resourceType] : guess;
+  let last = null;
+  for (const t of types) {
+    last = await cloudinary.uploader.destroy(publicId, { resource_type: t, invalidate: true });
+    if (last.result === 'ok') return last;
+  }
+  return last;
 };
 
 module.exports = {

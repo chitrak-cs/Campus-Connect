@@ -141,6 +141,10 @@ const joinGroup = async (req, res) => {
 // ✅ DELETE /api/groups/:id/leave
 const leaveGroup = async (req, res) => {
   try {
+    const { rows: g } = await pool.query(`SELECT created_by FROM study_groups WHERE id = $1`, [req.params.id]);
+    if (g.length && g[0].created_by === req.user.id) {
+      return res.status(400).json({ message: 'Transfer or delete the group instead' });
+    }
     await pool.query(
       `DELETE FROM group_members 
        WHERE group_id = $1 AND user_id = $2`,

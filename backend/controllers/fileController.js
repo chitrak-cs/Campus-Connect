@@ -138,6 +138,24 @@ const getFiles = async (req, res) => {
   }
 };
 
+// ✅ GET /api/files/mine — your own uploads, including pending ones
+const getMyFiles = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.*, u.name AS uploader_name
+       FROM files f JOIN users u ON f.uploaded_by = u.id
+       WHERE f.uploaded_by = $1
+       ORDER BY f.created_at DESC
+       LIMIT 200`,
+      [req.user.id]
+    );
+    res.json({ files: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching your files' });
+  }
+};
+
 // ✅ GET /api/files/pending
 const getPendingFiles = async (req, res) => {
   try {
@@ -190,7 +208,10 @@ const deleteFile = async (req, res) => {
     }
 
     if (file.cloudinary_public_id) {
-      await deleteFromCloudinary(file.cloudinary_public_id, file.title);
+      const del = await deleteFromCloudinary(file.cloudinary_public_id, file.resource_type);
+      if (del?.result !== 'ok' && del?.result !== 'not found') {
+        console.error('Cloudinary delete unexpected result:', del?.result);
+      }
     }
 
     await pool.query(`DELETE FROM files WHERE id = $1`, [req.params.id]);
@@ -231,6 +252,7 @@ const incrementDownload = async (req, res) => {
 module.exports = {
   uploadFile,
   getFiles,
+  getMyFiles,
   getPendingFiles,
   approveFile,
   deleteFile,

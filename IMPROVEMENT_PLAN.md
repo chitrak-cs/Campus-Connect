@@ -225,17 +225,17 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 
 ## Phase 3: Remaining bug fixes
 
-- [ ] **3.1 [B2]** `ChatPage.jsx`: register **named handlers** and remove them with `socket.off(event, handler)`. Split the giant effect: one effect for connection status and presence, one for message listeners that reads `activeRoom` from a ref (so switching rooms doesn't re-register everything).
-- [ ] **3.2 [B3]** The server adds `group_name` to the `new_group_message` payload (look it up once on send). `Layout` notifications skip messages where `msg.sender_id === user.id`, and skip messages for the room that's currently open in Chat.
-- [ ] **3.3 [B4]** `deleteFile`: use the stored `resource_type`. For legacy rows with no `resource_type`, derive it from the `public_id` extension (raw public ids keep their extension) and fall back to trying `raw` then `image`. Write a one-off script `backend/scripts/cleanup-orphans.js` that lists Cloudinary assets in the folder with no DB row. **Dry-run by default; deleting requires `--delete` and Chitrak's OK.**
+- [x] **3.1 [B2]** `ChatPage.jsx`: register **named handlers** and remove them with `socket.off(event, handler)`. Split the giant effect: one effect for connection status and presence, one for message listeners that reads `activeRoom` from a ref (so switching rooms doesn't re-register everything).
+- [x] **3.2 [B3]** The server adds `group_name` to the `new_group_message` payload (look it up once on send). `Layout` notifications skip messages where `msg.sender_id === user.id`, and skip messages for the room that's currently open in Chat.
+- [x] **3.3 [B4]** `deleteFile`: use the stored `resource_type`. For legacy rows with no `resource_type`, derive it from the `public_id` extension (raw public ids keep their extension) and fall back to trying `raw` then `image`. Write a one-off script `backend/scripts/cleanup-orphans.js` that lists Cloudinary assets in the folder with no DB row. **Dry-run by default; deleting requires `--delete` and Chitrak's OK.**
 - [x] **3.4 [B5]** Clamp pagination: `page = max(1, int(page) || 1)`, `limit = min(50, max(1, int(limit) || 20))`. Apply the same pattern to messages and admin users.
-- [ ] **3.5 [B6]** `GET /api/files/mine` returns your uploads with an `is_approved` status; the UI is in F5.
+- [x] **3.5 [B6]** `GET /api/files/mine` returns your uploads with an `is_approved` status; the UI is in F5.
 - [x] **3.6 [B7]** Presence: `Map<userId, { user, sockets: Set<socketId> }>`. Mark a user offline only when their last socket disconnects. Emit `online_users` debounced (≥ 1 s).
-- [ ] **3.7 [B9]** Announcement notifications link to `/` (the dashboard's announcements section), or to a new `/announcements` page if one is built.
-- [ ] **3.8 [B10]** `FilesPage`: a single effect keyed on `filters` and a debounced `search`.
-- [ ] **3.9 [B11]** Remove the fake stats from the auth pages (the landing page shows real ones; see 5.5).
+- [x] **3.7 [B9]** Announcement notifications link to `/` (the dashboard's announcements section), or to a new `/announcements` page if one is built.
+- [x] **3.8 [B10]** `FilesPage`: a single effect keyed on `filters` and a debounced `search`.
+- [x] **3.9 [B11]** Remove the fake stats from the auth pages (the landing page shows real ones; see 5.5).
 - [x] **3.10 [B12]** `updateProfile`: update only the fields present in the body (`!== undefined`), and allow empty strings to clear department and year.
-- [ ] **3.11 [B14]** The group creator can't leave (return 400 "Transfer or delete the group instead"). Optionally add `POST /groups/:id/transfer { userId }`.
+- [x] **3.11 [B14]** The group creator can't leave (return 400 "Transfer or delete the group instead"). Optionally add `POST /groups/:id/transfer { userId }`.
 - [x] **3.12** `AdminPage` sends `is_active: 0/1`; send real booleans.
 - [ ] **3.13** Replace every `window.confirm` with the new `ConfirmDialog` (built in 5.2).
 
@@ -485,7 +485,7 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | 1.7 | On a non-auth 401 the app clears auth and dispatches `auth:logout`; `AuthContext` sets `user=null` and the route guard redirects to `/login` (no hard reload). The `?expired=1` param is not added yet; the banner belongs to 5.6. |
 | 2026-11-20 | 1.3 | Brevo path coded but untested (needs H2 key). Locally the SMTP vars in `.env` are used. Dev console fallback exists for when nothing is configured. |
 | 2026-11-20 | 1.4 | `rejectUnauthorized: true` works against Neon dev. |
-| 2026-11-20 | Phase 1 verify | Verified: backend boots, JSON 404, multer limit maps to 413 (isolated test), frontend `npm run build` passes. NOT yet verified: two-browser chat, `vite preview` on `/files`, wrong-password toast, single Verify request, real 60 MB upload. Needs a browser session. |
+| 2026-11-20 | Phase 1 verify | Verified: backend boots, JSON 404, multer limit maps to 413 (isolated test), frontend `npm run build` passes. Since verified in-browser: wrong-password toast, chat delivery. Still not verified: `vite preview` on `/files`, single Verify request, real 60 MB upload. |
 | 2026-11-20 | 2.x verify | Ran a 27-check script against Neon `dev` (faculty request, OTP 5-attempt lockout, resend cooldown, private-group join/members 403, socket isolation incl. old `join_groups` attack, self-demote block, role approve, deactivate invalidates token, files clamp, fake-pdf 400, helmet headers, 429 on login spam): all PASS. Script lived in scratchpad (not committed); becomes real tests in 8.1. |
 | 2026-11-20 | 2.2 | `removeMember` socket-leave is not wired yet because that endpoint is F4 (Phase 6). |
 | 2026-11-20 | 2.10 | CSP/headers written but NOT tested on a Vercel preview yet (done in 9.4). If anything breaks, switch to `Content-Security-Policy-Report-Only`. |
@@ -493,9 +493,15 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | 2.13 | Backend `npm audit --omit=dev`: 0 high/critical; 2 moderate left (`uuid` <11.1.1: only v3/v5/v6 with a `buf` arg is affected; we only call `v4()`). Frontend: 2 moderate left (`react-router` v6 line; fix needs v7, which the plan rules out). `@vitejs/plugin-react` kept on ^4 because 6.x needs Vite 8. Vite is now ^6. `@nextui-org/react` is in frontend deps but unused by `src`; left in place (not in plan), worth removing later. |
 | 2026-11-20 | 2.9 | Email domain restriction (`ALLOWED_EMAIL_DOMAINS`) implemented in `register` only (H5 still open: empty = allow all). |
 | 2026-11-20 | 3.x early | Done while rewriting the same code: 3.4, 3.6, 3.10, 3.12, 4.4. `group_name` added to group messages (part of 3.2); Layout notification filtering (own messages / open room) still TODO. |
+| 2026-11-20 | 3.x verify | In the browser (Vite dev + backend on Neon `dev`): wrong password shows toast with no reload (C7); logged-out `/files` redirects to `/login`, login persists across reload; message from another user shows live in the open room with no notification (3.2), and after visiting Chat + switching rooms a new message still notifies (B2). `/files/mine` and creator-can't-leave (3.11) verified over HTTP. |
+| 2026-11-20 | 3.x bug found | Found and fixed two regressions from my own Phase 2 socket code: (1) handlers were registered after an `await`, so events sent right after connect were dropped (now registered synchronously; group handlers await `roomsReady`); (2) debounced presence meant late-mounting clients saw "0 online" (server now sends the list on connect and on `get_online_users`). Re-run the 8.1 socket tests with an *immediate* send, not a delayed one. |
+| 2026-11-20 | 3.3 | Delete logic verified with a stubbed `destroy` (explicit type = 1 call; legacy rows try the likely type then fall back). Live Cloudinary upload/delete could NOT be verified here: uploads and destroy time out (499) from this machine, while `api.resources` read calls work. `cleanup-orphans.js` dry-run reports 0 orphans (3 assets, 3 rows). Please re-check B4 on production (9.7) or locally with a working network. |
+| 2026-11-20 | 3.8 | In dev, React StrictMode runs effects twice, so `/api/files` appears twice per page load in the network log; production builds make one request. Added a stale-response guard anyway. |
+| 2026-11-20 | 3.13 | Not done: `ConfirmDialog` is built in 5.2. Do this when 5.2 lands. |
+| 2026-11-20 | 3.5 | Backend endpoint done; the "My uploads" UI is F5/5.8. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
 
-- Phase 0: ☑ (0.7 partial)  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ☐  Phase 4: ☐  Phase 5: ☐
+- Phase 0: ☑ (0.7 partial)  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ☐  Phase 5: ☐
 - Phase 6: ☐  Phase 7: ☐  Phase 8: ☐  Phase 9: ☐  Phase 10: ☐

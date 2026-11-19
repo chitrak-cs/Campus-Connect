@@ -131,25 +131,31 @@ export default function FilesPage() {
   const [search, setSearch] = useState('')
   const [filters, setFilters] = useState({ type: 'All', dept: 'All', year: 'All' })
 
-  const fetchFiles = async () => {
-    setLoading(true)
-    try {
-      const params = {}
-      if (search) params.search = search
-      if (filters.type !== 'All') params.type = filters.type
-      if (filters.dept !== 'All') params.dept = filters.dept
-      if (filters.year !== 'All') params.year = filters.year
-      const res = await api.get('/files', { params })
-      setFiles(res.data.files || [])
-    } catch { toast.error('Failed to load files') }
-    finally { setLoading(false) }
-  }
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
+  const fetchFiles = () => setReloadKey(k => k + 1) // used after upload
 
-  useEffect(() => { fetchFiles() }, [filters])
+  // Debounce the search box
   useEffect(() => {
-    const t = setTimeout(fetchFiles, 400)
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 400)
     return () => clearTimeout(t)
   }, [search])
+
+  // One fetch effect for filters, search and manual reloads (ignores stale responses)
+  useEffect(() => {
+    let cancelled = false
+    const params = {}
+    if (debouncedSearch) params.search = debouncedSearch
+    if (filters.type !== 'All') params.type = filters.type
+    if (filters.dept !== 'All') params.dept = filters.dept
+    if (filters.year !== 'All') params.year = filters.year
+    setLoading(true)
+    api.get('/files', { params })
+      .then(res => { if (!cancelled) setFiles(res.data.files || []) })
+      .catch(() => { if (!cancelled) toast.error('Failed to load files') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [filters, debouncedSearch, reloadKey])
 
   const handleDownload = async (f) => {
     try {
