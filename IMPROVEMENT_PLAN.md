@@ -119,7 +119,7 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 - [x] **0.4** Fix the dev ports (B8): set the Vite proxy target to `http://localhost:5001` for both `/api` and `/socket.io`. Make sure `frontend/.env` has `VITE_API_URL=/api` for local dev so the proxy is used.
 - [x] **0.5** Add `backend/.env.example` and `frontend/.env.example` listing every variable in §12 (names only, no values).
 - [x] **0.6** Add `"engines": { "node": ">=20" }` to both `package.json` files.
-- [~] **0.7** Run both apps locally (`npm run dev` in each) and confirm login works against the `dev` branch.
+- [x] **0.7** Run both apps locally (`npm run dev` in each) and confirm login works against the `dev` branch.
 
 ✅ **Verify:** the app runs locally on the dev DB, and `git status` shows no `.env` files staged.
 
@@ -503,5 +503,5 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 
 ## Progress summary (update at the end of each phase)
 
-- Phase 0: ☑ (0.7 partial)  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ☐  Phase 5: ☐
+- Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ☐  Phase 5: ☐
 - Phase 6: ☐  Phase 7: ☐  Phase 8: ☐  Phase 9: ☐  Phase 10: ☐
