@@ -35,10 +35,24 @@ const verifyOtp = z
 
 const resendOtp = z.object({ id: uuid });
 
+const forgotPassword = z.object({ email });
+
+const resetPassword = z.object({
+  resetId: uuid,
+  code: z.string().regex(/^\d{6}$/, 'Code must be 6 digits'),
+  newPassword: password,
+});
+
+const changePassword = z.object({
+  currentPassword: z.string().min(1, 'Current password is required').max(200),
+  newPassword: password,
+});
+
 const updateProfile = z.object({
   name: z.string().trim().min(1, 'Name cannot be empty').max(100).optional(),
   department: optNullText(100),
   year: optNullText(100),
+  bio: optNullText(500),
 });
 
 const uploadFields = z.object({
@@ -103,7 +117,7 @@ const adminUpdateUser = z.object({
 const chatContent = z.string().trim().min(1).max(2000);
 
 module.exports = {
-  register, login, verifyOtp, resendOtp, updateProfile, uploadFields, filesQuery, updateFile,
+  register, login, verifyOtp, resendOtp, forgotPassword, resetPassword, changePassword, updateProfile, uploadFields, filesQuery, updateFile,
   createGroup, joinByCode, announcement, adminCreateUser, adminUpdateUser,
   chatContent, uuid,
 };

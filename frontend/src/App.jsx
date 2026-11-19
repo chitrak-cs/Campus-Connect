@@ -5,6 +5,7 @@ import { Spinner } from './components/ui'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import Dashboard from './pages/Dashboard'
 import FilesPage from './pages/FilesPage'
 import ChatPage from './pages/ChatPage'
@@ -49,6 +50,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+      <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
       <Route path="/" element={<Gate />}>
         <Route index element={<Dashboard />} />
         <Route path="files" element={<FilesPage />} />

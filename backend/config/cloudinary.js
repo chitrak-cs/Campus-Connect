@@ -76,7 +76,38 @@ const deleteFromCloudinary = async (publicId, resourceType) => {
   return last;
 };
 
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  fileFilter: (_req, file, cb) => {
+    if (['image/jpeg', 'image/png'].includes(file.mimetype) && ['jpg', 'jpeg', 'png'].includes(extOf(file.originalname))) return cb(null, true);
+    const e = new Error('Avatar must be a JPG or PNG image');
+    e.status = 400;
+    cb(e);
+  },
+});
+
+const uploadAvatarToCloudinary = (buffer) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'Jadavpur_university/avatars',
+        resource_type: 'image',
+        transformation: [{ width: 256, height: 256, crop: 'fill', gravity: 'face' }],
+      },
+      (error, result) => (error ? reject(error) : resolve(result))
+    );
+    streamifier.createReadStream(buffer).pipe(stream);
+  });
+
+// Public id from a Cloudinary URL: .../upload/v123/folder/name.jpg -> folder/name
+const publicIdFromUrl = (url = '') => {
+  const m = url.match(/\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?((?:Jadavpur_university)\/.+?)\.[a-z0-9]+$/i);
+  return m ? m[1] : null;
+};
+
 module.exports = {
+  avatarUpload, uploadAvatarToCloudinary, publicIdFromUrl,
   cloudinary, upload, uploadToCloudinary, deleteFromCloudinary,
   ALLOWED_TYPES, extOf, sanitizeFilename,
 };

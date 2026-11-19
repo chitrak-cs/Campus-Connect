@@ -83,6 +83,13 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth:logout', onForcedLogout);
   }, []);
 
+  // Accept a fresh token (password change / reset). Pass `user` to also sign in.
+  const setSession = useCallback((token, nextUser) => {
+    saveAuth(token, nextUser);
+    if (nextUser) { setSessionExpired(false); setUser(nextUser); }
+    connectSocket(token);
+  }, []);
+
   const logout = useCallback(() => {
     clearAuth();
     setUser(null);
@@ -96,7 +103,7 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, sessionExpired, login, verifyOtp, register, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, sessionExpired, login, verifyOtp, register, setSession, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

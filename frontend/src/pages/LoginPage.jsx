@@ -75,8 +75,11 @@ export default function LoginPage() {
           )}
           <Input label="Email address" type="email" autoComplete="email" placeholder="you@university.ac.in" required
             value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
-          <PasswordInput autoComplete="current-password" placeholder="Your password" required
-            value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+          <div>
+            <PasswordInput autoComplete="current-password" placeholder="Your password" required
+              value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
+            <p style={{ textAlign: 'right', marginTop: 6 }}><Link to="/forgot-password" className="auth__link" style={{ fontSize: 'var(--fs-13)' }}>Forgot password?</Link></p>
+          </div>
           <Button type="submit" size="lg" block loading={loading}>Sign in</Button>
           <p className="auth__alt">No account yet? <Link to="/register">Create one</Link></p>
         </form>

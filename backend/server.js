@@ -256,7 +256,7 @@ app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     const tooBig = err.code === 'LIMIT_FILE_SIZE';
     return res.status(tooBig ? 413 : 400).json({
-      message: tooBig ? 'File too large (max 50 MB)' : err.message,
+      message: tooBig ? (err.field === 'avatar' ? 'Image too large (max 2 MB)' : 'File too large (max 50 MB)') : err.message,
     });
   }
   const status = err.status || err.statusCode || 500;

@@ -29,9 +29,6 @@
 .auth__strength > span { display: block; height: 100%; transition: width var(--dur) var(--ease), background var(--dur) var(--ease); }
 .pw-toggle { position: absolute; right: 4px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--text-muted); border-radius: var(--r-sm); }
 .pw-toggle:hover { color: var(--text); }
-.seg { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
-.seg__btn { padding: 10px 12px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 500; }
-.seg__btn[aria-pressed='true'] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 @media (max-width: 900px) {
   .auth { grid-template-columns: 1fr; }
   .auth__hero { padding: var(--space-5) var(--space-5) var(--space-6); gap: var(--space-4); }

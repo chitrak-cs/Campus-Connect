@@ -5,13 +5,14 @@ const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../config/db');
 const { sendEmail } = require('../utils/mailer');
 const { otpEmail } = require('../utils/emailTemplates');
+const { uploadAvatarToCloudinary, deleteFromCloudinary, publicIdFromUrl } = require('../config/cloudinary');
 
 const OTP_MAX_ATTEMPTS = 5;
 const OTP_TTL_MIN = 10;
 const RESEND_COOLDOWN_SEC = 60;
 const RESEND_MAX_PER_HOUR = 5;
 const PUBLIC_USER_COLS =
-  'id,name,email,role,requested_role,department,year,avatar_url,is_active,is_verified';
+  'id,name,email,role,requested_role,department,year,bio,avatar_url,is_active,is_verified';
 
 const generateToken = (user) =>
   jwt.sign({ id: user.id, tv: user.token_version ?? 0 }, process.env.JWT_SECRET, {
@@ -63,20 +64,20 @@ const sendOtpEmail = async (toEmail, otp, opts = {}) => {
 const MAIL_FAIL = { message: 'Could not send verification email, try again' };
 
 // Only login/register OTPs are verifiable here; `reset` is handled by its own endpoint.
-const verifyOtpRecord = async (id, code) => {
+const verifyOtpRecord = async (id, code, purposes = ['login', 'register']) => {
   // Atomically count the attempt; fails when used, expired, or attempts exhausted
   const { rows } = await pool.query(
     `UPDATE otps SET attempts = attempts + 1
-     WHERE id = $1 AND purpose IN ('login','register')
+     WHERE id = $1 AND purpose = ANY($3)
        AND used = FALSE AND attempts < $2 AND expires_at > NOW()
      RETURNING *`,
-    [id, OTP_MAX_ATTEMPTS]
+    [id, OTP_MAX_ATTEMPTS, purposes]
   );
 
   if (!rows.length) {
     const { rows: any } = await pool.query(
-      `SELECT used, attempts FROM otps WHERE id = $1 AND purpose IN ('login','register')`,
-      [id]
+      `SELECT used, attempts FROM otps WHERE id = $1 AND purpose = ANY($2)`,
+      [id, purposes]
     );
     if (any.length && any[0].attempts >= OTP_MAX_ATTEMPTS) {
       await pool.query(`UPDATE otps SET used = TRUE WHERE id = $1`, [id]);
@@ -253,7 +254,7 @@ const getMe = async (req, res) => {
 // ✅ UPDATE PROFILE — only provided fields change; '' clears department/year
 const updateProfile = async (req, res) => {
   try {
-    const { name, department, year } = req.body;
+    const { name, department, year, bio } = req.body;
     const sets = [];
     const params = [];
     const add = (col, val) => { params.push(val); sets.push(`${col}=$${params.length}`); };
@@ -261,6 +262,7 @@ const updateProfile = async (req, res) => {
     if (name !== undefined) add('name', name);
     if (department !== undefined) add('department', department || null);
     if (year !== undefined) add('year', year || null);
+    if (bio !== undefined) add('bio', bio || null);
 
     if (sets.length) {
       params.push(req.user.id);
@@ -275,4 +277,114 @@ const updateProfile = async (req, res) => {
   }
 };
 
-module.exports = { register, login, verifyOtp, resendOtp, getMe, updateProfile, generateToken };
+
+// ---- Forgot / reset password (no account enumeration) ----
+const FORGOT_MSG = { message: 'If that email is registered, we sent a 6-digit code.' };
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, email, is_active FROM users WHERE LOWER(email) = $1`,
+      [req.body.email]
+    );
+    const user = rows[0];
+    // Unknown emails get a random-looking id too, so responses are indistinguishable
+    let resetId = uuidv4();
+
+    if (user && user.is_active) {
+      const { rows: recent } = await pool.query(
+        `SELECT 1 FROM otps WHERE user_id = $1 AND purpose = 'reset' AND created_at > NOW() - INTERVAL '60 seconds'`,
+        [user.id]
+      );
+      if (!recent.length) {
+        const created = await createOtp(user.id, 'reset', 15);
+        resetId = created.id;
+        try {
+          const tpl = otpEmail({ code: created.otp, ttl: 15, heading: 'Your password reset code' });
+          await sendEmail({ to: user.email, ...tpl });
+        } catch (mailErr) {
+          console.error('Reset email failed:', mailErr.message);
+        }
+      }
+    }
+    res.json({ ...FORGOT_MSG, resetId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Could not start password reset' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { resetId, code, newPassword } = req.body;
+    const result = await verifyOtpRecord(resetId, code, ['reset']);
+    if (!result.ok) return res.status(400).json({ message: result.reason });
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await pool.query(
+      `UPDATE users SET password = $1, is_verified = TRUE, token_version = token_version + 1 WHERE id = $2`,
+      [hashed, result.userId]
+    );
+    const { rows } = await pool.query(
+      `SELECT ${PUBLIC_USER_COLS}, token_version FROM users WHERE id = $1`,
+      [result.userId]
+    );
+    const user = rows[0];
+    const token = generateToken(user);
+    delete user.token_version;
+    res.json({ token, user });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Could not reset password' });
+  }
+};
+
+// ---- Change password: other sessions are signed out (token_version), this one gets a fresh token ----
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const { rows } = await pool.query(`SELECT password FROM users WHERE id = $1`, [req.user.id]);
+    if (!rows.length || !(await bcrypt.compare(currentPassword, rows[0].password))) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+    if (currentPassword === newPassword) {
+      return res.status(400).json({ message: 'New password must be different from the current one' });
+    }
+    const hashed = await bcrypt.hash(newPassword, 12);
+    const { rows: updated } = await pool.query(
+      `UPDATE users SET password = $1, token_version = token_version + 1 WHERE id = $2 RETURNING token_version`,
+      [hashed, req.user.id]
+    );
+    const token = generateToken({ id: req.user.id, token_version: updated[0].token_version });
+    res.json({ token, message: 'Password updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Could not change password' });
+  }
+};
+
+// ---- Avatar upload (JPG/PNG up to 2 MB, cropped to 256x256 around the face) ----
+const uploadAvatar = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No image uploaded' });
+    const { rows: cur } = await pool.query(`SELECT avatar_url FROM users WHERE id = $1`, [req.user.id]);
+    const result = await uploadAvatarToCloudinary(req.file.buffer);
+
+    await pool.query(`UPDATE users SET avatar_url = $1 WHERE id = $2`, [result.secure_url, req.user.id]);
+
+    // Remove the previous avatar (best effort)
+    const oldId = publicIdFromUrl(cur[0]?.avatar_url);
+    if (oldId && oldId !== result.public_id) deleteFromCloudinary(oldId, 'image').catch(() => {});
+
+    const { rows } = await pool.query(`SELECT ${PUBLIC_USER_COLS} FROM users WHERE id = $1`, [req.user.id]);
+    res.json({ user: rows[0] });
+  } catch (err) {
+    console.error('Avatar upload error:', err.message || err);
+    res.status(500).json({ message: 'Could not upload avatar' });
+  }
+};
+
+module.exports = {
+  register, login, verifyOtp, resendOtp, getMe, updateProfile, generateToken,
+  forgotPassword, resetPassword, changePassword, uploadAvatar,
+};

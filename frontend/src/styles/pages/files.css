@@ -40,8 +40,6 @@
 .fcard--list .fcard__actions { margin-top: 0; margin-left: auto; }
 
 /* upload / edit */
-.upload-form { display: flex; flex-direction: column; gap: var(--space-4); }
-.upload-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
 .dropzone { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: var(--space-6); border: 2px dashed var(--border-strong); border-radius: var(--r-lg); background: var(--surface-2); color: var(--text-muted); cursor: pointer; transition: all var(--dur-fast) var(--ease); }
 .dropzone:hover, .dropzone.is-drag { border-color: var(--accent); background: var(--accent-soft); }
 .dropzone.is-error { border-color: var(--danger); }
@@ -50,8 +48,6 @@
 .dropzone__file { display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; max-width: 100%; }
 .dropzone__file strong { overflow-wrap: anywhere; }
 .dropzone__clear { position: absolute; right: -28px; top: 0; width: 22px; height: 22px; border-radius: 50%; border: 0; background: var(--border-strong); color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
-.progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: var(--space-3); }
-.progress span { display: block; height: 100%; background: var(--accent); transition: width 0.2s linear; }
 .upload-done { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--space-2); padding: var(--space-4) 0; }
 .upload-done svg { color: var(--success); }
 .upload-done p { color: var(--text-muted); font-size: var(--fs-14); }

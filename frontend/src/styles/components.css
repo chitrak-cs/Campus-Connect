@@ -32,3 +32,16 @@
 .alert--warning { background: var(--warning-soft); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 25%, transparent); }
 .muted { color: var(--text-muted); }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* shared form bits (moved from page stylesheets) */
+.upload-form { display: flex; flex-direction: column; gap: var(--space-4); }
+.upload-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.seg__btn { padding: 10px 12px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); border-radius: var(--r-md); font-size: var(--fs-14); font-weight: 500; }
+.seg__btn[aria-pressed='true'] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.privacy { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px; text-align: left; border: 1px solid var(--border-strong); background: var(--surface); border-radius: var(--r-md); color: var(--text-muted); }
+.privacy strong { color: var(--text); font-size: var(--fs-14); margin-top: 4px; }
+.privacy span { font-size: var(--fs-12); }
+.privacy[aria-pressed='true'] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); background: var(--surface-2); }
+.progress { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: var(--space-3); }
+.progress span { display: block; height: 100%; background: var(--accent); transition: width 0.2s linear; }

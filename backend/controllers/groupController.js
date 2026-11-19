@@ -176,11 +176,12 @@ const getMembers = async (req, res) => {
 
     const { rows } = await pool.query(
       `SELECT u.id, u.name, ${isSiteAdmin ? 'u.email,' : ''} u.department, u.year,
-              u.avatar_url, gm.role, gm.joined_at
+              u.avatar_url, gm.role, gm.joined_at, (sg.created_by = u.id) AS is_creator
        FROM group_members gm
        JOIN users u ON gm.user_id = u.id
+       JOIN study_groups sg ON sg.id = gm.group_id
        WHERE gm.group_id = $1
-       ORDER BY gm.role DESC, gm.joined_at ASC`,
+       ORDER BY gm.role ASC, gm.joined_at ASC`,
       [req.params.id]
     );
 
@@ -207,6 +208,64 @@ const joinByCode = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error joining group' });
+  }
+};
+
+// Can this user manage the group (site admin, creator, or group admin)?
+const canManageGroup = async (user, groupId) => {
+  if (user.role === 'admin') return { ok: true };
+  const { rows } = await pool.query(
+    `SELECT sg.created_by, gm.role
+     FROM study_groups sg
+     LEFT JOIN group_members gm ON gm.group_id = sg.id AND gm.user_id = $2
+     WHERE sg.id = $1`,
+    [groupId, user.id]
+  );
+  if (!rows.length) return { ok: false, notFound: true };
+  return { ok: rows[0].created_by === user.id || rows[0].role === 'admin' };
+};
+
+// DELETE /api/groups/:id/members/:userId - group admin or site admin; the creator can't be removed
+const removeMember = async (req, res) => {
+  try {
+    const { id, userId } = req.params;
+    const perm = await canManageGroup(req.user, id);
+    if (perm.notFound) return res.status(404).json({ message: 'Group not found' });
+    if (!perm.ok) return res.status(403).json({ message: 'Only group admins can remove members' });
+
+    const { rows } = await pool.query(`SELECT created_by FROM study_groups WHERE id = $1`, [id]);
+    if (rows[0].created_by === userId) return res.status(400).json({ message: "The group's creator can't be removed" });
+    if (userId === req.user.id) return res.status(400).json({ message: 'Use Leave to exit a group' });
+
+    const { rowCount } = await pool.query(
+      `DELETE FROM group_members WHERE group_id = $1 AND user_id = $2`,
+      [id, userId]
+    );
+    if (!rowCount) return res.status(404).json({ message: 'Member not found' });
+    roomOps.leave(req, userId, id);
+    res.json({ message: 'Member removed' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error removing member' });
+  }
+};
+
+// POST /api/groups/:id/invite-code/rotate - new code invalidates the old one
+const rotateInviteCode = async (req, res) => {
+  try {
+    const perm = await canManageGroup(req.user, req.params.id);
+    if (perm.notFound) return res.status(404).json({ message: 'Group not found' });
+    if (!perm.ok) return res.status(403).json({ message: 'Only group admins can change the invite code' });
+
+    const { rows } = await pool.query(
+      `UPDATE study_groups SET invite_code = $1 WHERE id = $2 AND is_private = TRUE RETURNING invite_code`,
+      [newInviteCode(), req.params.id]
+    );
+    if (!rows.length) return res.status(400).json({ message: 'Only private groups have invite codes' });
+    res.json({ invite_code: rows[0].invite_code });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error rotating invite code' });
   }
 };
 
@@ -248,5 +307,7 @@ module.exports = {
   leaveGroup,
   getMembers,
   joinByCode,
+  removeMember,
+  rotateInviteCode,
   deleteGroup,
 };
