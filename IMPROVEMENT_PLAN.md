@@ -165,23 +165,23 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 
 ## Phase 2: Security hardening (S1–S11)
 
-- [ ] **2.1 [S1] Faculty role by approval only.**
+- [x] **2.1 [S1] Faculty role by approval only.**
   - DB (via `initDB`): `ALTER TABLE users ADD COLUMN IF NOT EXISTS requested_role TEXT CHECK (requested_role IN ('faculty'))`.
   - `register`: always insert `role='student'`; if the body asks for faculty, set `requested_role='faculty'`.
   - Admin endpoints: `GET /api/admin/role-requests`, `POST /api/admin/role-requests/:id/approve` (sets `role='faculty'`, clears the request), `POST .../:id/reject`.
   - Register UI: label the toggle "I'm faculty (needs admin approval)" and show a note after signup.
-- [ ] **2.2 [S2] Authorize socket rooms** (`server.js`):
+- [x] **2.2 [S2] Authorize socket rooms** (`server.js`):
   - On `connection`: `socket.join('user:' + user.id)`, then query `SELECT group_id FROM group_members WHERE user_id=$1` and join each `group:<id>`. **This is the only way a socket gets into group rooms.**
   - Replace `join_groups` with a no-op that logs a deprecation, or remove it and remove the emit in `ChatPage.jsx`.
   - Expose `io` to controllers: `app.set('io', io)`. In `joinGroup`/`createGroup` call `req.app.get('io').in('user:' + req.user.id).socketsJoin('group:' + groupId)`; in `leaveGroup`, `removeMember` and `deleteGroup` call the matching `socketsLeave` (for deletion: `io.in('group:'+id).socketsLeave('group:'+id)`).
   - `send_group_message` and `typing_group`: require `socket.rooms.has('group:' + group_id)` (re-check membership in the DB only for send; the room check is enough for typing).
   - Admins: allowed to *read* any group via REST; for live updates, add an `admin_watch_group` event that joins only if `user.role === 'admin'`.
-- [ ] **2.3 [S3] Group privacy** (`groupController.js`):
+- [x] **2.3 [S3] Group privacy** (`groupController.js`):
   - `joinGroup`: if `is_private` and the user isn't an admin, return **403** "This group is invite-only".
   - Add `invite_code VARCHAR(12) UNIQUE` (generated with `crypto.randomBytes(6).toString('base64url')` for private groups on create, and for existing private groups on boot if null), plus `POST /api/groups/join-by-code { code }`.
   - `getMembers`: if the group is private, only members or a site admin can view it. **Don't return `email`** unless the requester is a site admin.
   - `getGroups`: only return `invite_code` to the group's creator or group admins.
-- [ ] **2.4 [S5] OTP hardening** (`authController.js`, schema in `initDB`):
+- [x] **2.4 [S5] OTP hardening** (`authController.js`, schema in `initDB`):
   - Move the `otps` table creation into `initDB`; add columns `code_hash TEXT`, `attempts INT DEFAULT 0`; keep `code` nullable for old rows (`ALTER TABLE otps ALTER COLUMN code DROP NOT NULL`).
   - Generate with `crypto.randomInt(100000, 1000000)`. Store `sha256(id + ':' + code)`, never the plain code. Compare with `crypto.timingSafeEqual`.
   - Max **5** attempts per OTP; after that, mark it used and return "Too many attempts, request a new code".
@@ -189,35 +189,35 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
   - When a new OTP is created, mark the user's previous unused OTPs of the same purpose as used.
   - Cleanup: on boot and every hour, `DELETE FROM otps WHERE created_at < NOW() - INTERVAL '1 day'`.
   - `POST /api/auth/resend-otp { id }`: 60 s cooldown per user and purpose, max 5 per hour.
-- [ ] **2.5 [S6] Rate limiting** with `express-rate-limit`:
+- [x] **2.5 [S6] Rate limiting** with `express-rate-limit`:
   - `app.set('trust proxy', 1)` (Render sits behind one proxy).
   - `authLimiter`: 10 req / 15 min / IP on `login`, `register`, `forgot-password`, `resend-otp`; `otpLimiter`: 15 / 15 min on `verify-otp` and `reset-password`; `apiLimiter`: 300 / 15 min on `/api`.
   - Socket: a per-socket token bucket allowing at most 8 messages per 10 s; silently drop extras and emit `rate_limited` once.
-- [ ] **2.6 [S7]** Add `helmet()` (API defaults are fine), lower `express.json` and `urlencoded` limits to `100kb`, and make CORS read a **comma-separated `CLIENT_URLS`** list (keep `CLIENT_URL` as a fallback) for both Express and Socket.IO.
-- [ ] **2.7 [S8] Validation** with `zod` in `backend/middleware/validate.js` (`validate(schema)` → 400 with the first issue's message). Apply to every POST/PUT body and the `GET /files` query:
+- [x] **2.6 [S7]** Add `helmet()` (API defaults are fine), lower `express.json` and `urlencoded` limits to `100kb`, and make CORS read a **comma-separated `CLIENT_URLS`** list (keep `CLIENT_URL` as a fallback) for both Express and Socket.IO.
+- [x] **2.7 [S8] Validation** with `zod` in `backend/middleware/validate.js` (`validate(schema)` → 400 with the first issue's message). Apply to every POST/PUT body and the `GET /files` query:
   - name ≤ 100, email valid ≤ 150 (lower-cased and trimmed), password 8–72 chars (72 is bcrypt's limit), title ≤ 255, description ≤ 2000, subject ≤ 150, `file_type` in the enum, department/year from the known lists or ≤ 100, group name 3–100, announcement title ≤ 255 and content ≤ 5000, priority in the enum.
   - Chat (`server.js`): `content` must be a string, trimmed, 1–2000 chars; `group_id` must be a UUID.
   - Route params `:id` must be UUIDs (return 400 instead of a pg 500).
-- [ ] **2.8 [S9] Upload safety** (`config/cloudinary.js`, `fileController.js`):
+- [x] **2.8 [S9] Upload safety** (`config/cloudinary.js`, `fileController.js`):
   - Allow-list map `ext → mime` (`pdf, doc, docx, ppt, pptx, jpg, jpeg, png`). Reject when the extension isn't allowed **or** doesn't match `file.mimetype`.
   - Derive `resource_type` from the allow-list (`raw` for documents, `image` for images) and **store it** (new columns `resource_type TEXT`, `original_name TEXT`, `mime_type TEXT`, `size_bytes BIGINT`).
   - If the DB insert fails after a successful Cloudinary upload, delete the Cloudinary asset.
   - Sanitize `original_name` (strip path separators and control characters, max 200 chars).
-- [ ] **2.9 [S10] Smaller fixes:**
+- [x] **2.9 [S10] Smaller fixes:**
   - Normalize email (`trim().toLowerCase()`) in register, login, admin createUser and forgot-password. Look users up with `WHERE LOWER(email) = $1` until D2 has run.
   - Login: check the password **before** revealing "Account disabled".
   - `getStats`: on error return 500, not `_error`.
   - `/api/announcements`: add `protect`. (The landing page uses the new public stats endpoint instead.)
   - Admin `updateUser`: block changing your own role or `is_active`, and block demoting or deactivating the **last** active admin. Same check in `deleteUser`.
   - Remove the demo-credentials box from `LoginPage.jsx`. Change `seed.js` to read `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` from env and **refuse to run when `NODE_ENV=production`**.
-- [ ] **2.10 Frontend security headers** in `frontend/vercel.json` → `headers` for `/(.*)`: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, and a CSP:
+- [x] **2.10 Frontend security headers** in `frontend/vercel.json` → `headers` for `/(.*)`: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, and a CSP:
   ```
   default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self' https://campus-connect-backend-4g6v.onrender.com wss://campus-connect-backend-4g6v.onrender.com; frame-src https://res.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self'
   ```
   (If the backend URL changes in P4, update it here. Test on a Vercel **preview** first; if something breaks, ship `Content-Security-Policy-Report-Only` and note it in §13.)
-- [ ] **2.11 Auth token storage (B1):** replace the per-tab scheme with single keys `cc_token` and `cc_user` in localStorage. Delete `utils/tabSession.js`. On app start, remove any leftover `au_token_*` and `au_user_*` keys. Keep the Bearer-header approach (cookies across Vercel and Render are cross-site and unreliable).
-- [ ] **2.12 Token invalidation:** add `users.token_version INT DEFAULT 0`, include `tv` in the JWT payload, and have `protect` and the socket middleware reject tokens where `tv !== token_version`. Bump it on password change, password reset and deactivation. Keep the `JWT_EXPIRES_IN` default at `7d` and document it in the README.
-- [ ] **2.13 [S11] Dependencies:** remove `mysql2` and `pool`. Upgrade `nodemailer` to the latest (or remove it if only Brevo is used in prod; keep it as a devDependency for local SMTP if wanted). Run `npm audit fix` (**not** `--force`) in both apps, then bump `axios`, `react-router-dom` (stay on v6), `socket.io`/`socket.io-client` and `vite` to their latest compatible minors. Re-run `npm audit --omit=dev` and get it to **0 high/critical** in the backend.
+- [x] **2.11 Auth token storage (B1):** replace the per-tab scheme with single keys `cc_token` and `cc_user` in localStorage. Delete `utils/tabSession.js`. On app start, remove any leftover `au_token_*` and `au_user_*` keys. Keep the Bearer-header approach (cookies across Vercel and Render are cross-site and unreliable).
+- [x] **2.12 Token invalidation:** add `users.token_version INT DEFAULT 0`, include `tv` in the JWT payload, and have `protect` and the socket middleware reject tokens where `tv !== token_version`. Bump it on password change, password reset and deactivation. Keep the `JWT_EXPIRES_IN` default at `7d` and document it in the README.
+- [x] **2.13 [S11] Dependencies:** remove `mysql2` and `pool`. Upgrade `nodemailer` to the latest (or remove it if only Brevo is used in prod; keep it as a devDependency for local SMTP if wanted). Run `npm audit fix` (**not** `--force`) in both apps, then bump `axios`, `react-router-dom` (stay on v6), `socket.io`/`socket.io-client` and `vite` to their latest compatible minors. Re-run `npm audit --omit=dev` and get it to **0 high/critical** in the backend.
 
 ✅ **Verify (on the dev DB):** a register request with `role:"faculty"` creates a student with `requested_role`. A non-member socket that emits a message to a private group gets nothing and receives nothing (test with two browsers). `POST /groups/<private>/join` returns 403. The 6th wrong OTP is rejected even with the right code. The 11th login attempt in 15 minutes returns 429. `curl -I` on the API shows helmet headers.
 
@@ -228,15 +228,15 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 - [ ] **3.1 [B2]** `ChatPage.jsx`: register **named handlers** and remove them with `socket.off(event, handler)`. Split the giant effect: one effect for connection status and presence, one for message listeners that reads `activeRoom` from a ref (so switching rooms doesn't re-register everything).
 - [ ] **3.2 [B3]** The server adds `group_name` to the `new_group_message` payload (look it up once on send). `Layout` notifications skip messages where `msg.sender_id === user.id`, and skip messages for the room that's currently open in Chat.
 - [ ] **3.3 [B4]** `deleteFile`: use the stored `resource_type`. For legacy rows with no `resource_type`, derive it from the `public_id` extension (raw public ids keep their extension) and fall back to trying `raw` then `image`. Write a one-off script `backend/scripts/cleanup-orphans.js` that lists Cloudinary assets in the folder with no DB row. **Dry-run by default; deleting requires `--delete` and Chitrak's OK.**
-- [ ] **3.4 [B5]** Clamp pagination: `page = max(1, int(page) || 1)`, `limit = min(50, max(1, int(limit) || 20))`. Apply the same pattern to messages and admin users.
+- [x] **3.4 [B5]** Clamp pagination: `page = max(1, int(page) || 1)`, `limit = min(50, max(1, int(limit) || 20))`. Apply the same pattern to messages and admin users.
 - [ ] **3.5 [B6]** `GET /api/files/mine` returns your uploads with an `is_approved` status; the UI is in F5.
-- [ ] **3.6 [B7]** Presence: `Map<userId, { user, sockets: Set<socketId> }>`. Mark a user offline only when their last socket disconnects. Emit `online_users` debounced (≥ 1 s).
+- [x] **3.6 [B7]** Presence: `Map<userId, { user, sockets: Set<socketId> }>`. Mark a user offline only when their last socket disconnects. Emit `online_users` debounced (≥ 1 s).
 - [ ] **3.7 [B9]** Announcement notifications link to `/` (the dashboard's announcements section), or to a new `/announcements` page if one is built.
 - [ ] **3.8 [B10]** `FilesPage`: a single effect keyed on `filters` and a debounced `search`.
 - [ ] **3.9 [B11]** Remove the fake stats from the auth pages (the landing page shows real ones; see 5.5).
-- [ ] **3.10 [B12]** `updateProfile`: update only the fields present in the body (`!== undefined`), and allow empty strings to clear department and year.
+- [x] **3.10 [B12]** `updateProfile`: update only the fields present in the body (`!== undefined`), and allow empty strings to clear department and year.
 - [ ] **3.11 [B14]** The group creator can't leave (return 400 "Transfer or delete the group instead"). Optionally add `POST /groups/:id/transfer { userId }`.
-- [ ] **3.12** `AdminPage` sends `is_active: 0/1`; send real booleans.
+- [x] **3.12** `AdminPage` sends `is_active: 0/1`; send real booleans.
 - [ ] **3.13** Replace every `window.confirm` with the new `ConfirmDialog` (built in 5.2).
 
 ✅ **Verify:** after visiting Chat and switching rooms 3 times, a message from another user still produces a notification. Deleting a PDF removes it from Cloudinary (check the Cloudinary console).
@@ -268,7 +268,7 @@ All of this goes in `initDB()` as **idempotent** statements (`IF NOT EXISTS`). R
     created_at TIMESTAMP DEFAULT NOW(),
     PRIMARY KEY (user_id, file_id));
   ```
-- [ ] **4.4 [P2]** Rewrite `getStats` as one query with scalar subqueries, and add `pendingRoleRequests` to it.
+- [x] **4.4 [P2]** Rewrite `getStats` as one query with scalar subqueries, and add `pendingRoleRequests` to it.
 - [ ] **4.5** Don't convert columns to `TIMESTAMPTZ` (a risky migration for little gain). Just make sure the frontend formats dates in local time.
 
 ✅ **Verify:** `initDB` runs twice in a row on `dev` with no errors. `EXPLAIN` on the group-messages query uses `idx_messages_group_created`.
@@ -486,9 +486,16 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | 1.3 | Brevo path coded but untested (needs H2 key). Locally the SMTP vars in `.env` are used. Dev console fallback exists for when nothing is configured. |
 | 2026-11-20 | 1.4 | `rejectUnauthorized: true` works against Neon dev. |
 | 2026-11-20 | Phase 1 verify | Verified: backend boots, JSON 404, multer limit maps to 413 (isolated test), frontend `npm run build` passes. NOT yet verified: two-browser chat, `vite preview` on `/files`, wrong-password toast, single Verify request, real 60 MB upload. Needs a browser session. |
+| 2026-11-20 | 2.x verify | Ran a 27-check script against Neon `dev` (faculty request, OTP 5-attempt lockout, resend cooldown, private-group join/members 403, socket isolation incl. old `join_groups` attack, self-demote block, role approve, deactivate invalidates token, files clamp, fake-pdf 400, helmet headers, 429 on login spam): all PASS. Script lived in scratchpad (not committed); becomes real tests in 8.1. |
+| 2026-11-20 | 2.2 | `removeMember` socket-leave is not wired yet because that endpoint is F4 (Phase 6). |
+| 2026-11-20 | 2.10 | CSP/headers written but NOT tested on a Vercel preview yet (done in 9.4). If anything breaks, switch to `Content-Security-Policy-Report-Only`. |
+| 2026-11-20 | 2.12 | `token_version` checked in `protect` + socket auth, bumped on deactivation. Bumps for password change/reset come with F1/F2. Tokens issued before this change (no `tv`) count as version 0, so existing sessions stay valid. |
+| 2026-11-20 | 2.13 | Backend `npm audit --omit=dev`: 0 high/critical; 2 moderate left (`uuid` <11.1.1: only v3/v5/v6 with a `buf` arg is affected; we only call `v4()`). Frontend: 2 moderate left (`react-router` v6 line; fix needs v7, which the plan rules out). `@vitejs/plugin-react` kept on ^4 because 6.x needs Vite 8. Vite is now ^6. `@nextui-org/react` is in frontend deps but unused by `src`; left in place (not in plan), worth removing later. |
+| 2026-11-20 | 2.9 | Email domain restriction (`ALLOWED_EMAIL_DOMAINS`) implemented in `register` only (H5 still open: empty = allow all). |
+| 2026-11-20 | 3.x early | Done while rewriting the same code: 3.4, 3.6, 3.10, 3.12, 4.4. `group_name` added to group messages (part of 3.2); Layout notification filtering (own messages / open room) still TODO. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
 
-- Phase 0: ☑ (0.7 partial)  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☐  Phase 3: ☐  Phase 4: ☐  Phase 5: ☐
+- Phase 0: ☑ (0.7 partial)  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ☐  Phase 4: ☐  Phase 5: ☐
 - Phase 6: ☐  Phase 7: ☐  Phase 8: ☐  Phase 9: ☐  Phase 10: ☐
