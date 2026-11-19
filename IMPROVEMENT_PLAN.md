@@ -40,7 +40,7 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 
 ## 2. Actions only Chitrak can do
 
-- [ ] **H1 (do this today): check the admin password.** The login page publicly shows `admin@Jadavpur.ac.in / admin123`, and `seed.js` creates that account. Production has exactly one admin. Try logging in on the live site with those credentials. **If it works, anyone can be admin.** Change it right away:
+- [x] **H1 (done 2026-11-20): check the admin password.** The login page publicly shows `admin@Jadavpur.ac.in / admin123`, and `seed.js` creates that account. Production has exactly one admin. Try logging in on the live site with those credentials. **If it works, anyone can be admin.** Change it right away:
   1. `cd backend && node -e "console.log(require('bcryptjs').hashSync('YOUR-NEW-STRONG-PASSWORD', 12))"`
   2. In the Neon SQL editor (production branch): `UPDATE users SET password = '<hash from step 1>' WHERE role = 'admin';`
 - [ ] **H2: create a transactional email account** with an HTTPS API (recommended: **Brevo**, which can send from a verified single sender such as your Gmail without owning a domain; alternative: Resend, which needs a domain). Verify the sender address, create an API key and add it to Render as `BREVO_API_KEY` (Task C3).
@@ -499,6 +499,7 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | 3.8 | In dev, React StrictMode runs effects twice, so `/api/files` appears twice per page load in the network log; production builds make one request. Added a stale-response guard anyway. |
 | 2026-11-20 | 3.13 | Not done: `ConfirmDialog` is built in 5.2. Do this when 5.2 lands. |
 | 2026-11-20 | 3.5 | Backend endpoint done; the "My uploads" UI is F5/5.8. |
+| 2026-11-20 | H1 | Confirmed `admin123` DID work on the live site (anyone could be admin). Production admin password changed by the owner's request (new value kept only in the gitignored `backend/.env`; never in the repo or UI). Old password verified rejected, new one accepted. The production DB has no `token_version` column yet, so tokens issued with the old password stay valid until JWT expiry (7d) or until the Phase 9 deploy adds token versioning. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
