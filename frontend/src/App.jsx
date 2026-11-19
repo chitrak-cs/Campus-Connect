@@ -15,10 +15,10 @@ import ProfilePage from './pages/ProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
 
 const Splash = () => (
-  <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--bg)' }}>
-    <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+  <div className="splash">
+    <div className="splash__inner">
       <Spinner size="lg" label="Loading Campus Connect" />
-      <p style={{ marginTop: 12 }}>Loading Campus Connect…</p>
+      <p>Loading Campus Connect…</p>
     </div>
   </div>
 )

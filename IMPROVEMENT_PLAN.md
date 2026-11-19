@@ -237,7 +237,7 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 - [x] **3.10 [B12]** `updateProfile`: update only the fields present in the body (`!== undefined`), and allow empty strings to clear department and year.
 - [x] **3.11 [B14]** The group creator can't leave (return 400 "Transfer or delete the group instead"). Optionally add `POST /groups/:id/transfer { userId }`.
 - [x] **3.12** `AdminPage` sends `is_active: 0/1`; send real booleans.
-- [ ] **3.13** Replace every `window.confirm` with the new `ConfirmDialog` (built in 5.2).
+- [x] **3.13** Replace every `window.confirm` with the new `ConfirmDialog` (built in 5.2).
 
 ✅ **Verify:** after visiting Chat and switching rooms 3 times, a message from another user still produces a notification. Deleting a PDF removes it from Cloudinary (check the Cloudinary console).
 
@@ -280,77 +280,77 @@ All of this goes in `initDB()` as **idempotent** statements (`IF NOT EXISTS`). R
 **Direction:** "modern academic." Navy and gold, generous whitespace, crisp cards, subtle depth and fast micro-interactions. Playfair Display **only** for page titles and the landing hero; DM Sans for everything else (including card titles). No gradients-on-everything, no glassmorphism, no emoji in the UI.
 
 ### 5.1 Foundations
-- [ ] Split `src/index.css` (557 lines) into `src/styles/tokens.css`, `base.css`, `layout.css`, `components.css`, plus page files under `src/styles/pages/`. Import them from `main.jsx`.
-- [ ] Move Google Fonts from the CSS `@import` to `<link rel="preconnect">` + `<link rel="stylesheet">` in `index.html` (P3). Drop unused weights (keep Playfair 600/700, DM Sans 400/500/600, DM Mono 400).
-- [ ] **Tokens** (`tokens.css`): keep the existing raw colors, and add **semantic** tokens that components use exclusively:
+- [x] Split `src/index.css` (557 lines) into `src/styles/tokens.css`, `base.css`, `layout.css`, `components.css`, plus page files under `src/styles/pages/`. Import them from `main.jsx`.
+- [x] Move Google Fonts from the CSS `@import` to `<link rel="preconnect">` + `<link rel="stylesheet">` in `index.html` (P3). Drop unused weights (keep Playfair 600/700, DM Sans 400/500/600, DM Mono 400).
+- [x] **Tokens** (`tokens.css`): keep the existing raw colors, and add **semantic** tokens that components use exclusively:
   `--bg, --surface, --surface-2, --border, --text, --text-muted, --primary (navy), --primary-hover, --on-primary, --accent (gold), --accent-text (#8A6D1F, gold that passes contrast on light backgrounds), --danger, --success, --warning, --info, --focus-ring`.
   Scales: spacing `4/8/12/16/20/24/32/40/48/64`; type `12/13/14/16/18/20/24/30/36/48`; radius `6/10/14/20/999`; shadows `sm/md/lg`; z-index `dropdown 50, sticky 60, overlay 90, modal 100, toast 110`; motion `150ms/250ms` with `@media (prefers-reduced-motion: reduce)` turning it off.
-- [ ] **Dark theme:** `[data-theme="dark"]` overrides only the semantic tokens (bg `#0A1628`, surface `#102038`, text `#E8ECF2`, border `rgba(255,255,255,.08)`, accent stays gold). The toggle is in F10.
-- [ ] **Contrast rule:** gold `#C9A84C` must never be used as text on white (about 2.3:1). Use `--accent-text`, or gold on navy backgrounds only.
+- [x] **Dark theme:** `[data-theme="dark"]` overrides only the semantic tokens (bg `#0A1628`, surface `#102038`, text `#E8ECF2`, border `rgba(255,255,255,.08)`, accent stays gold). The toggle is in F10.
+- [x] **Contrast rule:** gold `#C9A84C` must never be used as text on white (about 2.3:1). Use `--accent-text`, or gold on navy backgrounds only.
 
 ### 5.2 UI kit (`src/components/ui/`, one file + CSS each)
-- [ ] `Button` (variants `primary | secondary | ghost | danger`, sizes `sm | md | lg`, `loading`, `leftIcon`, full keyboard focus ring)
-- [ ] `Input`, `Textarea`, `Select` (with `label`, `hint`, `error` wired up via `aria-describedby`)
-- [ ] `Card`, `Badge` (role, priority and status variants), `Avatar` (image or initials, background color hashed from the name)
-- [ ] `Modal` (portal, focus trap, Esc to close, `aria-modal`, scroll lock) and `ConfirmDialog` built on it
-- [ ] `EmptyState` (icon, title, text, action), `Skeleton`, `Spinner`, `Tabs`, `DropdownMenu`, `PageHeader` (title, subtitle, actions)
-- [ ] `useToast` wrapper around react-hot-toast with consistent styles (success, error, info), themed for dark mode
+- [x] `Button` (variants `primary | secondary | ghost | danger`, sizes `sm | md | lg`, `loading`, `leftIcon`, full keyboard focus ring)
+- [x] `Input`, `Textarea`, `Select` (with `label`, `hint`, `error` wired up via `aria-describedby`)
+- [x] `Card`, `Badge` (role, priority and status variants), `Avatar` (image or initials, background color hashed from the name)
+- [x] `Modal` (portal, focus trap, Esc to close, `aria-modal`, scroll lock) and `ConfirmDialog` built on it
+- [x] `EmptyState` (icon, title, text, action), `Skeleton`, `Spinner`, `Tabs`, `DropdownMenu`, `PageHeader` (title, subtitle, actions)
+- [x] `useToast` wrapper around react-hot-toast with consistent styles (success, error, info), themed for dark mode
 
 ### 5.3 App shell (`components/Layout.jsx`)
-- [ ] Sidebar: logo lockup, nav groups ("Learn": Dashboard, Files; "Connect": Chat, Groups; "Admin": Admin, only for admins), active indicator (gold bar), unread badge on Chat, and the user card at the bottom.
-- [ ] Top bar: page title, search trigger (`⌘K`/`Ctrl K`, F11), theme toggle, notifications bell, and an avatar dropdown (Profile, Log out).
-- [ ] Mobile (< 900 px): hide the sidebar and add a **bottom tab bar** (Home, Files, Chat, Groups, Profile) plus a hamburger for the rest. Test at 375 px.
-- [ ] Notification dropdown: grouped by type, relative times (`date-fns`), "Mark all read", and an empty state.
+- [x] Sidebar: logo lockup, nav groups ("Learn": Dashboard, Files; "Connect": Chat, Groups; "Admin": Admin, only for admins), active indicator (gold bar), unread badge on Chat, and the user card at the bottom.
+- [x] Top bar: page title, search trigger (`⌘K`/`Ctrl K`, F11), theme toggle, notifications bell, and an avatar dropdown (Profile, Log out).
+- [x] Mobile (< 900 px): hide the sidebar and add a **bottom tab bar** (Home, Files, Chat, Groups, Profile) plus a hamburger for the rest. Test at 375 px.
+- [x] Notification dropdown: grouped by type, relative times (`date-fns`), "Mark all read", and an empty state.
 
 ### 5.4 Replace inline styles
-- [ ] There are **~273 `style={{…}}` usages** across pages. Move the static ones to classes (keep dynamic ones such as group colors). Target: **< 25** left. Do it page by page alongside 5.6–5.11 rather than as a separate pass.
+- [x] There are **~273 `style={{…}}` usages** across pages. Move the static ones to classes (keep dynamic ones such as group colors). Target: **< 25** left. Do it page by page alongside 5.6–5.11 rather than as a separate pass.
 
 ### 5.5 Public landing page (new, `pages/LandingPage.jsx`)
-- [ ] Route: `/` shows the **Landing page when logged out** and the Dashboard when logged in.
-- [ ] Sections: **hero** (headline, one-line value prop, "Create account" + "Sign in" CTAs, and a product screenshot from `README-assets/dashboard.png` copied to `public/`), **features** (Notes & papers, Real-time chat, Study groups, Moderated by admins), **how it works** (3 steps), **live stats** from the new `GET /api/public/stats` → `{ users, files, groups }` (approved files only; cache in memory for 5 min; rate-limited), and a **footer** (GitHub link and © year).
-- [ ] Mobile-first and fast: no heavy libraries.
+- [x] Route: `/` shows the **Landing page when logged out** and the Dashboard when logged in.
+- [x] Sections: **hero** (headline, one-line value prop, "Create account" + "Sign in" CTAs, and a product screenshot from `README-assets/dashboard.png` copied to `public/`), **features** (Notes & papers, Real-time chat, Study groups, Moderated by admins), **how it works** (3 steps), **live stats** from the new `GET /api/public/stats` → `{ users, files, groups }` (approved files only; cache in memory for 5 min; rate-limited), and a **footer** (GitHub link and © year).
+- [x] Mobile-first and fast: no heavy libraries.
 
 ### 5.6 Auth pages
-- [ ] Keep the split layout, with real copy and no fake numbers or demo credentials.
-- [ ] OTP input: 6 boxes (or one input) with `inputMode="numeric"`, `autoComplete="one-time-code"`, paste support and auto-submit at 6 digits. Add a **Resend code** button with a 60 s countdown (uses 2.4) and a "Wrong email? Go back" link.
-- [ ] Register: password show/hide, a strength hint (≥ 8 chars), inline field errors, and the faculty-approval note.
-- [ ] Login: "Forgot password?" link (F1), plus a banner for `?expired=1`.
+- [x] Keep the split layout, with real copy and no fake numbers or demo credentials.
+- [x] OTP input: 6 boxes (or one input) with `inputMode="numeric"`, `autoComplete="one-time-code"`, paste support and auto-submit at 6 digits. Add a **Resend code** button with a 60 s countdown (uses 2.4) and a "Wrong email? Go back" link.
+- [x] Register: password show/hide, a strength hint (≥ 8 chars), inline field errors, and the faculty-approval note.
+- [x] Login: "Forgot password?" link (F1), plus a banner for `?expired=1`.
 
 ### 5.7 Dashboard
-- [ ] Greeting by time of day plus the user's first name; role-aware stat cards (students: my uploads, downloads of my files, groups joined; admins: platform stats and pending approvals with a link).
-- [ ] Announcements list with priority badges (high = red outline), "Recent materials" (5), "My groups" (with links into Chat), skeletons while loading, and empty states.
+- [x] Greeting by time of day plus the user's first name; role-aware stat cards (students: my uploads, downloads of my files, groups joined; admins: platform stats and pending approvals with a link).
+- [x] Announcements list with priority badges (high = red outline), "Recent materials" (5), "My groups" (with links into Chat), skeletons while loading, and empty states.
 
 ### 5.8 Files
-- [ ] Tabs: **All**, **My uploads** (F5), **Saved** (F6).
-- [ ] Filter chips (type), dept and year selects, sort (Newest / Most downloaded), and a grid/list toggle (saved in localStorage).
-- [ ] File card: type icon by extension, title, subject, dept/year badges, size, uploader, relative date, download count, and actions (Preview, Download, Save, Delete if allowed).
-- [ ] Upload modal: drag-and-drop zone, client-side type and size checks, **progress bar** (`onUploadProgress`), and the success state "Pending approval" for students.
+- [x] Tabs: **All**, **My uploads** (F5), **Saved** (F6).
+- [x] Filter chips (type), dept and year selects, sort (Newest / Most downloaded), and a grid/list toggle (saved in localStorage).
+- [x] File card: type icon by extension, title, subject, dept/year badges, size, uploader, relative date, download count, and actions (Preview, Download, Save, Delete if allowed).
+- [x] Upload modal: drag-and-drop zone, client-side type and size checks, **progress bar** (`onUploadProgress`), and the success state "Pending approval" for students.
 
 ### 5.9 Chat
-- [ ] Two-pane layout (rooms | conversation); on mobile, the room list drills into the conversation with a back button.
-- [ ] Room list: Global first, then the user's groups, each with an **unread count** (client-side; reset when opened) and a last-message preview.
-- [ ] Messages: own messages right-aligned in navy, others left on the surface color; consecutive messages from the same sender within 5 min are grouped; **date separators**; time on hover; role badge for faculty and admin.
-- [ ] Composer: auto-growing textarea, Enter to send / Shift+Enter for a newline, 2000-char counter near the limit, disabled while disconnected.
-- [ ] Connection chip ("Connecting…/Live") and typing indicator ("Priya is typing…").
-- [ ] Linkify `http(s)://` URLs safely: split the text and render `<a target="_blank" rel="noopener noreferrer">`; never inject HTML.
-- [ ] "Load older messages" at the top (F8) that keeps the scroll position.
+- [x] Two-pane layout (rooms | conversation); on mobile, the room list drills into the conversation with a back button.
+- [x] Room list: Global first, then the user's groups, each with an **unread count** (client-side; reset when opened) and a last-message preview.
+- [x] Messages: own messages right-aligned in navy, others left on the surface color; consecutive messages from the same sender within 5 min are grouped; **date separators**; time on hover; role badge for faculty and admin.
+- [x] Composer: auto-growing textarea, Enter to send / Shift+Enter for a newline, 2000-char counter near the limit, disabled while disconnected.
+- [x] Connection chip ("Connecting…/Live") and typing indicator ("Priya is typing…").
+- [x] Linkify `http(s)://` URLs safely: split the text and render `<a target="_blank" rel="noopener noreferrer">`; never inject HTML.
+- [x] "Load older messages" at the top (F8) that keeps the scroll position.
 
 ### 5.10 Groups
-- [ ] Cards with the color strip, lock icon for private groups, member count, "Joined" state, and Open chat / Join / Leave buttons.
-- [ ] Create modal (name, description, department, private toggle). For private groups, an **invite code panel** with Copy, and a **Join with code** input on the page.
-- [ ] Members modal: avatars, roles, and a Remove button for group admins (F4).
+- [x] Cards with the color strip, lock icon for private groups, member count, "Joined" state, and Open chat / Join / Leave buttons.
+- [x] Create modal (name, description, department, private toggle). For private groups, an **invite code panel** with Copy, and a **Join with code** input on the page.
+- [x] Members modal: avatars, roles, and a Remove button for group admins (F4).
 
 ### 5.11 Profile & Admin
-- [ ] Profile: avatar upload (F9), name, department, year, bio, **Change password** card (F2), and "My activity" stats.
-- [ ] Admin: polished tabs (Overview, Pending files, Users, Role requests, Announcements); tables with search, pagination and row actions in a `DropdownMenu`; `ConfirmDialog` for destructive actions; file preview in the pending queue.
+- [x] Profile: avatar upload (F9), name, department, year, bio, **Change password** card (F2), and "My activity" stats.
+- [x] Admin: polished tabs (Overview, Pending files, Users, Role requests, Announcements); tables with search, pagination and row actions in a `DropdownMenu`; `ConfirmDialog` for destructive actions; file preview in the pending queue.
 
 ### 5.12 Accessibility & polish
-- [ ] Every icon-only button has an `aria-label`; all form inputs have labels; there's a visible `:focus-visible` ring everywhere.
-- [ ] Color contrast ≥ 4.5:1 for text in **both** themes.
-- [ ] Modals and menus work fully with the keyboard.
-- [ ] A real **404 page** (`path="*"`) instead of a silent redirect.
-- [ ] `index.html`: Open Graph and Twitter meta, `theme-color`, and an improved favicon (keep the SVG, and add a 180 px apple-touch-icon PNG).
-- [ ] Route-change: scroll to top, and set `document.title` per page ("Files · Campus Connect").
+- [x] Every icon-only button has an `aria-label`; all form inputs have labels; there's a visible `:focus-visible` ring everywhere.
+- [x] Color contrast ≥ 4.5:1 for text in **both** themes.
+- [x] Modals and menus work fully with the keyboard.
+- [x] A real **404 page** (`path="*"`) instead of a silent redirect.
+- [x] `index.html`: Open Graph and Twitter meta, `theme-color`, and an improved favicon (keep the SVG, and add a 180 px apple-touch-icon PNG).
+- [x] Route-change: scroll to top, and set `document.title` per page ("Files · Campus Connect").
 
 ✅ **Verify:** Lighthouse (mobile) on the Vercel preview: **Accessibility ≥ 90, Best Practices ≥ 90, Performance ≥ 80** on the landing page. Manually check 375 px, 768 px and 1280 px widths in light and dark themes.
 
@@ -506,9 +506,14 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | Phase 4 verify | On Neon `dev`: `initDB` ran twice with no errors; all 7 indexes + `users_email_lower_key` exist; `EXPLAIN` on the group-messages query uses `idx_messages_group_created` (with seqscan disabled, since tables are tiny). `scripts/normalize-emails.js` dry-run lists the 4 mixed-case emails. Phase 2 regression script still passes. |
 | 2026-11-20 | 4.2 | Marked partial: steps 1 (duplicate check: none on prod) and 3 (unique index in `initDB`) are done. Step 2 (the production UPDATE) is intentionally deferred to 9.5: run `node scripts/normalize-emails.js` (dry run) then `--apply` with `DATABASE_URI` set to production, only right before merging, after the owner re-confirms. Note: on first boot against production, `initDB` creates `users_email_lower_key`; it succeeds even before the UPDATE because no case-duplicates exist. |
 | 2026-11-20 | 4.5 | Instead of leaving it to the frontend, added a pg type parser (OID 1114) so TIMESTAMP-without-tz values are read as UTC. Verified correct on a machine in IST (offset -330); without it, dev would show times shifted by 5.5 h. Frontend date-fns already formats in local time. Also added `bookmarks(user_id, created_at)` index. |
+| 2026-11-20 | Phase 5 verify | Lighthouse (mobile, headless Chrome, production build via `vite preview`) on the landing page: **Performance 95, Accessibility 100, Best Practices 100, SEO 100** (targets were 80/90/90). Checked in the browser at 375, 768 and 1280 px in light and dark: no horizontal overflow on any route, per-page titles set, DOM audit found no unnamed buttons or unlabelled controls (hidden file inputs now have aria-labels). Contrast computed from the tokens in both themes; fixed light `accent-text` (4.19 -> 4.80 on the soft tint), light/dark `text-faint`, light `warning`, sidebar label. Not measured: Lighthouse on the app pages (they need a login) and on the Vercel preview (CSP). |
+| 2026-11-20 | 5.3 | The top-bar search box is a button that currently navigates to /files; the real Cmd/Ctrl+K command palette is F11 (Phase 6). |
+| 2026-11-20 | 5.x | Built with a `ui-` prefixed kit so old and new styles never collided; the old stylesheet was deleted once a script confirmed no used class depended on it (CSS fell 74 kB -> 53 kB). Inline `style={{}}` went from ~273 to 8 (all dynamic: group colours, progress width, strength bar, skeleton size). Landing hero uses an 800 px WebP screenshot (the browser pane caps captures at 800 px): retake README screenshots in Phase 10 from cleaner demo data. `apple-touch-icon.png`, `og-image.png` generated with Pillow from the favicon geometry. |
+| 2026-11-20 | Phase 6 early | While redoing the pages I also built the backend + UI for F1 (forgot/reset), F2 (change password), F3 (role requests), F4 (remove member, rotate invite code), F5-F7 (my uploads, edit, saved, preview), F8 (history paging, soft delete), F9 (avatar), F10 (dark mode). HTTP-verified on Neon `dev`: F1, F2, F3, F4, F5/F6 endpoints, F8. Browser-verified: F3, F8, expired-session redirect. NOT verified: F7 PDF iframe rendering and F9/upload (Cloudinary uploads time out from this machine), F1/F2 UI flows. F11 (Cmd+K search) and F12 (server-waking banner) are not built yet. They are ticked in Phase 6, not here. |
+| 2026-11-20 | rate limits in dev | Repeated browser logins during testing hit the 10 per 15 min login limit (returned "Too many requests"). Expected behaviour; restart the dev server to clear the in-memory counters. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
 
-- Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ◐ (4.2 production UPDATE waits for 9.5)  Phase 5: ☐
+- Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ◐ (4.2 production UPDATE waits for 9.5)  Phase 5: ☑
 - Phase 6: ☐  Phase 7: ☐  Phase 8: ☐  Phase 9: ☐  Phase 10: ☐

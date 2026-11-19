@@ -78,7 +78,7 @@ export default function LoginPage() {
           <div>
             <PasswordInput autoComplete="current-password" placeholder="Your password" required
               value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} />
-            <p style={{ textAlign: 'right', marginTop: 6 }}><Link to="/forgot-password" className="auth__link" style={{ fontSize: 'var(--fs-13)' }}>Forgot password?</Link></p>
+            <p className="auth__forgot"><Link to="/forgot-password" className="auth__link">Forgot password?</Link></p>
           </div>
           <Button type="submit" size="lg" block loading={loading}>Sign in</Button>
           <p className="auth__alt">No account yet? <Link to="/register">Create one</Link></p>

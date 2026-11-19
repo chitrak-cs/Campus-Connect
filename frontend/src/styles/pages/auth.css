@@ -35,3 +35,6 @@
   .auth__hero-body { display: none; }
   .auth__panel { align-items: flex-start; padding-top: var(--space-8); }
 }
+.auth__strength-wrap { margin-top: 8px; }
+.auth__strength-label { margin-top: 4px; }
+.auth__forgot { text-align: right; margin-top: 6px; font-size: var(--fs-13); }

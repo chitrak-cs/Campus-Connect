@@ -34,8 +34,8 @@ export default function CreateGroupModal({ onClose, onCreated }) {
           <option value="">All departments</option>{DEPTS.map((d) => <option key={d}>{d}</option>)}
         </Select>
         <Textarea label="Description" maxLength={2000} placeholder="What will this group study?" value={form.description} onChange={(e) => set('description', e.target.value)} />
-        <fieldset style={{ border: 0 }}>
-          <legend className="ui-label" style={{ marginBottom: 6 }}>Privacy</legend>
+        <fieldset className="fieldset">
+          <legend className="ui-label legend">Privacy</legend>
           <div className="seg">
             {[{ val: false, icon: Globe, label: 'Public', sub: 'Anyone can join' }, { val: true, icon: Lock, label: 'Private', sub: 'Join with an invite code' }].map((o) => (
               <button key={String(o.val)} type="button" className="privacy" aria-pressed={form.is_private === o.val} onClick={() => set('is_private', o.val)}>

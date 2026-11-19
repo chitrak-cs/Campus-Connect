@@ -21,7 +21,7 @@ export default function OtpStep({ email, code, setCode, onVerify, onResend, onBa
       <Button type="submit" size="lg" block loading={loading} disabled={code.length !== 6}>Verify</Button>
       <div className="auth__otp-meta">
         <button type="button" className="auth__link auth__link-btn" onClick={onBack}>
-          <ArrowLeft size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> Wrong email? Go back
+          <ArrowLeft size={13} aria-hidden="true" className="icon-inline" /> Wrong email? Go back
         </button>
         {left > 0
           ? <span aria-live="polite">Resend code in {left}s</span>

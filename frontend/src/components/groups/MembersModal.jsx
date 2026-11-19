@@ -58,7 +58,7 @@ export default function MembersModal({ group, onClose, onChanged }) {
         </div>
       )}
 
-      {loading ? <div style={{ display: 'grid', placeItems: 'center', padding: 32 }}><Spinner /></div>
+      {loading ? <div className="center-pad"><Spinner /></div>
         : members.length === 0 ? <EmptyState title="No members yet" />
         : (
           <ul className="members">

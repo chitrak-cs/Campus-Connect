@@ -15,7 +15,7 @@ export default function ConfirmDialog({ open, title = 'Are you sure?', message, 
         <Button variant="secondary" onClick={onCancel} disabled={busy}>{cancelLabel}</Button>
         <Button variant={danger ? 'danger' : 'primary'} onClick={run} loading={busy}>{confirmLabel}</Button>
       </>}>
-      <p style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-14)' }}>{message}</p>
+      <p className="ui-confirm__msg">{message}</p>
     </Modal>
   )
 }

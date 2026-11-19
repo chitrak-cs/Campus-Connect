@@ -71,14 +71,14 @@ export default function UploadModal({ onClose, onUploaded, isPrivileged }) {
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click() } }}
             onDragOver={(e) => { e.preventDefault(); setDrag(true) }} onDragLeave={() => setDrag(false)}
             onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files[0]) }}>
-            <input ref={inputRef} type="file" hidden accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png" onChange={(e) => pick(e.target.files[0])} />
+            <input ref={inputRef} type="file" hidden aria-label="Choose a file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.jpeg,.png" onChange={(e) => pick(e.target.files[0])} />
             <UploadCloud size={28} aria-hidden="true" />
             {file ? (
               <div className="dropzone__file"><strong>{file.name}</strong><span>{formatBytes(file.size)}</span>
                 <button type="button" className="dropzone__clear" aria-label="Remove file" onClick={(e) => { e.stopPropagation(); setFile(null) }}><X size={14} /></button></div>
             ) : (<><strong>Drop a file here or click to browse</strong><span>PDF, Word, PowerPoint, JPG or PNG. Max 50 MB.</span></>)}
           </div>
-          {fileError && <p className="ui-field__msg ui-field__msg--error" role="alert" style={{ marginTop: 6 }}>{fileError}</p>}
+          {fileError && <p className="ui-field__msg ui-field__msg--error" role="alert">{fileError}</p>}
           {busy && <div className="progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div>}
         </div>
         <Input label="Title" required maxLength={255} placeholder="e.g. Data Structures, Unit 3 notes" value={form.title} onChange={(e) => set('title', e.target.value)} />

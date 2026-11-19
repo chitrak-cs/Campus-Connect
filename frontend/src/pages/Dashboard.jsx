@@ -68,7 +68,7 @@ export default function Dashboard() {
             {[stats.pending > 0 && `${stats.pending} file${stats.pending > 1 ? 's' : ''} pending approval`,
               stats.pendingRoleRequests > 0 && `${stats.pendingRoleRequests} faculty request${stats.pendingRoleRequests > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
           </span>
-          <ArrowRight size={14} aria-hidden="true" style={{ marginLeft: 'auto' }} />
+          <ArrowRight size={14} aria-hidden="true" className="push-right" />
         </button>
       )}
 
@@ -93,7 +93,7 @@ export default function Dashboard() {
                         {[f.subject, f.department, f.year].filter(Boolean).join(' · ')}<span className="dot-sep" />by {f.uploader_name}{fileSize(f) && <><span className="dot-sep" />{fileSize(f)}</>}
                       </div>
                     </div>
-                    <span className="row-card__meta" title="Downloads"><Download size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {f.download_count}</span>
+                    <span className="row-card__meta" title="Downloads"><Download size={13} aria-hidden="true" className="icon-inline" /> {f.download_count}</span>
                     <Button size="sm" variant="secondary" onClick={() => navigate('/files')}>View</Button>
                   </div>
                 ))}
@@ -112,7 +112,7 @@ export default function Dashboard() {
             ) : (
               <div className="stack">
                 {groups.map((g) => (
-                  <button key={g.id} type="button" className="row-card" style={{ textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
+                  <button key={g.id} type="button" className="row-card row-card--button"
                     onClick={() => navigate('/chat', { state: { groupId: g.id } })}>
                     <span className="group-dot" style={{ background: g.avatar_color }}>{g.name[0].toUpperCase()}</span>
                     <div className="row-card__main">

@@ -84,7 +84,7 @@ export default function ProfilePage() {
             <div className="profile__avatar">
               <Avatar name={user?.name} src={user?.avatar_url} size="xl" />
               <button type="button" className="profile__cam" onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Change profile photo"><Camera size={16} /></button>
-              <input ref={fileRef} type="file" hidden accept="image/jpeg,image/png" onChange={pickAvatar} />
+              <input ref={fileRef} type="file" hidden aria-label="Choose a profile photo" accept="image/jpeg,image/png" onChange={pickAvatar} />
             </div>
             <div>
               <h2 className="profile__name">{user?.name}</h2>
@@ -93,7 +93,7 @@ export default function ProfilePage() {
             </div>
           </div>
           {user?.requested_role && (
-            <div className="auth__banner auth__banner--info" role="note"><Info size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />An admin will review your faculty request. You'll keep student access until then.</div>
+            <div className="auth__banner auth__banner--info" role="note"><Info size={16} aria-hidden="true" className="banner-icon" />An admin will review your faculty request. You'll keep student access until then.</div>
           )}
           <form className="profile__form" onSubmit={save}>
             <Input label="Full name" required maxLength={100} value={form.name} onChange={(e) => set('name', e.target.value)} />

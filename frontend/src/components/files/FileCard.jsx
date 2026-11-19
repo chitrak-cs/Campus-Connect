@@ -26,7 +26,7 @@ export default function FileCard({ file, view, canManage, showStatus, onPreview,
       <p className="fcard__meta">
         {file.uploader_name}<span className="dot-sep" />{formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
         {size && <><span className="dot-sep" />{size}</>}
-        <span className="dot-sep" /><Download size={12} aria-hidden="true" style={{ verticalAlign: '-1px' }} /> {file.download_count}
+        <span className="dot-sep" /><Download size={12} aria-hidden="true" className="icon-inline" /> {file.download_count}
       </p>
 
       <div className="fcard__actions">

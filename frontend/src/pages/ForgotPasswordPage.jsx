@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
             onChange={(e) => { setPassword(e.target.value); setError('') }} />
           <Button type="submit" size="lg" block loading={loading}>Update password</Button>
           <div className="auth__otp-meta">
-            <button type="button" className="auth__link auth__link-btn" onClick={() => setResetId(null)}><ArrowLeft size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> Use a different email</button>
+            <button type="button" className="auth__link auth__link-btn" onClick={() => setResetId(null)}><ArrowLeft size={13} aria-hidden="true" className="icon-inline" /> Use a different email</button>
             {left > 0 ? <span aria-live="polite">Resend in {left}s</span>
               : <button type="button" className="auth__link auth__link-btn" onClick={request} disabled={loading}>Resend code</button>}
           </div>

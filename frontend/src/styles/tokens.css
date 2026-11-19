@@ -19,21 +19,21 @@
   --border-strong: #D3D0C6;
   --text: #1C1B18;
   --text-muted: #5F5D56;
-  --text-faint: #8A8880;
+  --text-faint: #6F6D66;
   --primary: #0B1F3A;
   --primary-hover: #16315A;
   --on-primary: #FFFFFF;
   --accent: #C9A84C;
   --accent-hover: #E8C97A;
   --on-accent: #0B1F3A;
-  --accent-text: #8A6D1F;      /* gold that passes contrast on light backgrounds */
+  --accent-text: #7F6419;      /* gold that passes 4.5:1 on white and on the soft gold tint */
   --accent-soft: #F5EDD4;
   --danger: #B3261E;
   --danger-soft: rgba(179, 38, 30, 0.1);
   --success: #1A7A4A;
   --success-soft: rgba(26, 122, 74, 0.1);
-  --warning: #9A6700;
-  --warning-soft: rgba(154, 103, 0, 0.12);
+  --warning: #8F5F00;
+  --warning-soft: rgba(143, 95, 0, 0.12);
   --info: #1A5FA8;
   --info-soft: rgba(26, 95, 168, 0.1);
   --focus-ring: #1A5FA8;
@@ -77,26 +77,6 @@
   --sidebar-w: 248px;
   --topbar-h: 60px;
   --tabbar-h: 60px;
-
-  /* ── legacy aliases so not-yet-migrated pages keep working (removed after all pages migrate) ── */
-  --gray-50: var(--surface-2);
-  --gray-100: var(--border);
-  --gray-200: var(--border-strong);
-  --gray-300: var(--text-faint);
-  --gray-400: var(--text-faint);
-  --gray-500: var(--text-muted);
-  --gray-600: var(--text-muted);
-  --gray-700: var(--text-muted);
-  --gray-900: var(--text);
-  --red: var(--danger);
-  --green: var(--success);
-  --blue: var(--info);
-  --radius-sm: var(--r-sm);
-  --radius: var(--r-md);
-  --radius-lg: var(--r-lg);
-  --shadow: var(--shadow-md);
-  --transition: var(--dur-fast) var(--ease);
-  --header-h: var(--topbar-h);
 }
 
 [data-theme='dark'] {
@@ -108,7 +88,7 @@
   --border-strong: rgba(255, 255, 255, 0.18);
   --text: #E8ECF2;
   --text-muted: #A3AEC0;
-  --text-faint: #7C879A;
+  --text-faint: #8E99AB;
   --primary: #C9A84C;
   --primary-hover: #E8C97A;
   --on-primary: #0B1F3A;
@@ -133,9 +113,6 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55);
-  /* legacy: the old stylesheet used --navy as a text colour for headings */
-  --navy: #E8ECF2;
-  --white: #102038;
 }
 
 @media (prefers-reduced-motion: reduce) {

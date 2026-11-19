@@ -54,7 +54,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="landing__shot">
-          <img src="/landing-preview.png" alt="Campus Connect dashboard showing recent files, announcements and quick actions" width="1200" height="750" fetchpriority="high" />
+          <img src="/landing-preview.webp" alt="Campus Connect dashboard showing recent files, announcements and quick actions" width="800" height="503" fetchpriority="high" />
         </div>
       </section>
 
@@ -85,7 +85,7 @@ export default function LandingPage() {
           {STEPS.map(({ icon: Icon, title, text }, i) => (
             <li key={title} className="landing__step">
               <span className="landing__step-num" aria-hidden="true">{i + 1}</span>
-              <div><h3><Icon size={16} aria-hidden="true" style={{ verticalAlign: '-2px', marginRight: 6 }} />{title}</h3><p>{text}</p></div>
+              <div><h3><Icon size={16} aria-hidden="true" className="icon-inline icon-inline--gap" />{title}</h3><p>{text}</p></div>
             </li>
           ))}
         </ol>

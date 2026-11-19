@@ -117,9 +117,9 @@ export default function RegisterPage() {
             <PasswordInput autoComplete="new-password" placeholder="At least 8 characters" value={form.password} error={errors.password}
               onChange={(e) => set('password', e.target.value)} />
             {form.password && (
-              <div style={{ marginTop: 8 }}>
+              <div className="auth__strength-wrap">
                 <div className="auth__strength" aria-hidden="true"><span style={{ width: STRENGTH[s].w, background: STRENGTH[s].color }} /></div>
-                <p className="ui-field__msg" style={{ marginTop: 4 }} aria-live="polite">{STRENGTH[s].label}</p>
+                <p className="ui-field__msg auth__strength-label" aria-live="polite">{STRENGTH[s].label}</p>
               </div>
             )}
           </div>
@@ -131,15 +131,15 @@ export default function RegisterPage() {
               <option value="">Select</option>{YEARS.map((y) => <option key={y}>{y}</option>)}
             </Select>
           </div>
-          <fieldset style={{ border: 0 }}>
-            <legend className="ui-label" style={{ marginBottom: 6 }}>I am a</legend>
+          <fieldset className="fieldset">
+            <legend className="ui-label legend">I am a</legend>
             <div className="seg">
               <button type="button" className="seg__btn" aria-pressed={form.role === 'student'} onClick={() => set('role', 'student')}>Student</button>
               <button type="button" className="seg__btn" aria-pressed={form.role === 'faculty'} onClick={() => set('role', 'faculty')}>Faculty (needs admin approval)</button>
             </div>
           </fieldset>
           {form.role === 'faculty' && (
-            <div className="auth__banner auth__banner--info" role="note"><Info size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
+            <div className="auth__banner auth__banner--info" role="note"><Info size={16} aria-hidden="true" className="banner-icon" />
               You'll start as a student. An admin reviews faculty requests before the role is granted.</div>
           )}
           <Button type="submit" size="lg" block loading={loading}>Create account</Button>
