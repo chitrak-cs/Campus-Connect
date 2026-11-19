@@ -1,6 +1,8 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 const crypto = require('crypto');
+// Columns are TIMESTAMP (no tz) holding UTC; without this, pg parses them as the server's local time.
+require('pg').types.setTypeParser(1114, (v) => new Date(v.replace(' ', 'T') + 'Z'));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URI,
@@ -167,6 +169,29 @@ const initDB = async () => {
         ADD COLUMN IF NOT EXISTS mime_type TEXT,
         ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
     `);
+
+    // ── Phase 4: remaining columns, bookmarks, indexes (all idempotent) ──
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;`);
+    await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        file_id UUID REFERENCES files(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (user_id, file_id)
+      );
+    `);
+
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_group_created  ON messages (group_id, created_at DESC);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_global_created ON messages (created_at DESC) WHERE is_global;`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_files_approved_created  ON files (is_approved, created_at DESC);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_files_uploaded_by       ON files (uploaded_by);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_group_members_user      ON group_members (user_id);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_otps_user_purpose       ON otps (user_id, purpose);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_bookmarks_user          ON bookmarks (user_id, created_at DESC);`);
+
+    // Case-insensitive unique email. Fails loudly (rather than silently) if duplicates exist.
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_key ON users (LOWER(email));`);
   } finally {
     client.release();
   }

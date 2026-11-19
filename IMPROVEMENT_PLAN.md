@@ -247,7 +247,7 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 
 All of this goes in `initDB()` as **idempotent** statements (`IF NOT EXISTS`). Run it on the `dev` branch first.
 
-- [ ] **4.1 [P1] Indexes:**
+- [x] **4.1 [P1] Indexes:**
   ```sql
   CREATE INDEX IF NOT EXISTS idx_messages_group_created  ON messages (group_id, created_at DESC);
   CREATE INDEX IF NOT EXISTS idx_messages_global_created ON messages (created_at DESC) WHERE is_global;
@@ -256,11 +256,11 @@ All of this goes in `initDB()` as **idempotent** statements (`IF NOT EXISTS`). R
   CREATE INDEX IF NOT EXISTS idx_group_members_user      ON group_members (user_id);
   CREATE INDEX IF NOT EXISTS idx_otps_user_purpose       ON otps (user_id, purpose);
   ```
-- [ ] **4.2 [D2] Case-insensitive unique email.**
+- [~] **4.2 [D2] Case-insensitive unique email.**
   1. Check: `SELECT LOWER(email), COUNT(*) FROM users GROUP BY 1 HAVING COUNT(*) > 1;` (must be empty; if not, stop and ask Chitrak).
   2. **Ask Chitrak (H4)**, then run once on production: `UPDATE users SET email = LOWER(TRIM(email));`. Put this in a script (`backend/scripts/normalize-emails.js`), **not** in `initDB`.
   3. Add `CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_key ON users (LOWER(email));` to `initDB`.
-- [ ] **4.3** Columns added by the other phases (collect them here so it's one tidy block): `users.requested_role`, `users.token_version`, `users.bio TEXT`, `files.resource_type`, `files.original_name`, `files.mime_type`, `files.size_bytes`, `study_groups.invite_code`, `messages.deleted_at TIMESTAMP`, `otps.code_hash`, `otps.attempts`, plus the new `bookmarks` table:
+- [x] **4.3** Columns added by the other phases (collect them here so it's one tidy block): `users.requested_role`, `users.token_version`, `users.bio TEXT`, `files.resource_type`, `files.original_name`, `files.mime_type`, `files.size_bytes`, `study_groups.invite_code`, `messages.deleted_at TIMESTAMP`, `otps.code_hash`, `otps.attempts`, plus the new `bookmarks` table:
   ```sql
   CREATE TABLE IF NOT EXISTS bookmarks (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -269,7 +269,7 @@ All of this goes in `initDB()` as **idempotent** statements (`IF NOT EXISTS`). R
     PRIMARY KEY (user_id, file_id));
   ```
 - [x] **4.4 [P2]** Rewrite `getStats` as one query with scalar subqueries, and add `pendingRoleRequests` to it.
-- [ ] **4.5** Don't convert columns to `TIMESTAMPTZ` (a risky migration for little gain). Just make sure the frontend formats dates in local time.
+- [x] **4.5** Don't convert columns to `TIMESTAMPTZ` (a risky migration for little gain). Just make sure the frontend formats dates in local time.
 
 ✅ **Verify:** `initDB` runs twice in a row on `dev` with no errors. `EXPLAIN` on the group-messages query uses `idx_messages_group_created`.
 
@@ -503,9 +503,12 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | H4/D2 | Pre-check on production: 13 users, no case-insensitive duplicates; 4 rows would change (admin + 3 demo students). The UPDATE itself is deliberately NOT run yet: the live (old) backend does case-sensitive email lookup, so lower-casing now would break admin login until the new backend is deployed. Run it at 9.5 right before the merge. |
 | 2026-11-20 | H2 | No Brevo/Sendinblue mail found in Gmail, so no account exists. Signup (password, CAPTCHA, email code) must be done by the owner. |
 | 2026-11-20 | H2 | Brevo account + verified sender (`chitrak14789@gmail.com`) created by the owner. `BREVO_API_KEY`, `MAIL_FROM`, `MAIL_FROM_NAME` set on Render (`srv-d8vsgaurnols73e3e9u0`, which triggered a redeploy of the unchanged `main` code) and in the gitignored `backend/.env`. Brevo's "Authorized IPs" blocking for API keys had to be DEACTIVATED (Render free-plan IPs change); the first send returned 401 until then. Verified: `sendEmail()` via Brevo delivered the branded OTP email to Gmail. The key was pasted into chat, so rotate it in Brevo (SMTP & API) when convenient and update Render + `.env`. |
+| 2026-11-20 | Phase 4 verify | On Neon `dev`: `initDB` ran twice with no errors; all 7 indexes + `users_email_lower_key` exist; `EXPLAIN` on the group-messages query uses `idx_messages_group_created` (with seqscan disabled, since tables are tiny). `scripts/normalize-emails.js` dry-run lists the 4 mixed-case emails. Phase 2 regression script still passes. |
+| 2026-11-20 | 4.2 | Marked partial: steps 1 (duplicate check: none on prod) and 3 (unique index in `initDB`) are done. Step 2 (the production UPDATE) is intentionally deferred to 9.5: run `node scripts/normalize-emails.js` (dry run) then `--apply` with `DATABASE_URI` set to production, only right before merging, after the owner re-confirms. Note: on first boot against production, `initDB` creates `users_email_lower_key`; it succeeds even before the UPDATE because no case-duplicates exist. |
+| 2026-11-20 | 4.5 | Instead of leaving it to the frontend, added a pg type parser (OID 1114) so TIMESTAMP-without-tz values are read as UTC. Verified correct on a machine in IST (offset -330); without it, dev would show times shifted by 5.5 h. Frontend date-fns already formats in local time. Also added `bookmarks(user_id, created_at)` index. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
 
-- Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ☐  Phase 5: ☐
+- Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ◐ (4.2 production UPDATE waits for 9.5)  Phase 5: ☐
 - Phase 6: ☐  Phase 7: ☐  Phase 8: ☐  Phase 9: ☐  Phase 10: ☐
