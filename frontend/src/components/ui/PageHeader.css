@@ -1,0 +1,5 @@
+.ui-page-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-6); }
+.ui-page-header__title { font-size: var(--fs-30); color: var(--text); }
+.ui-page-header__sub { font-size: var(--fs-14); color: var(--text-muted); margin-top: 4px; }
+.ui-page-header__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+@media (max-width: 600px) { .ui-page-header__title { font-size: var(--fs-24); } }

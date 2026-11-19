@@ -1,0 +1,9 @@
+.ui-spinner {
+  display: inline-block; width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--border-strong); border-top-color: var(--primary);
+  animation: ui-spin 0.7s linear infinite; flex-shrink: 0;
+}
+.ui-spinner--sm { width: 14px; height: 14px; }
+.ui-spinner--lg { width: 32px; height: 32px; border-width: 3px; }
+.ui-btn--primary .ui-spinner { border-color: rgba(255,255,255,0.35); border-top-color: var(--on-primary); }
+@keyframes ui-spin { to { transform: rotate(360deg); } }

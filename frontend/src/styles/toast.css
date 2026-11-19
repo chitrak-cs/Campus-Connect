@@ -1,0 +1,6 @@
+/* react-hot-toast, themed through tokens so it follows light/dark */
+.cc-toast {
+  background: var(--surface) !important; color: var(--text) !important; border: 1px solid var(--border);
+  border-radius: var(--r-md) !important; box-shadow: var(--shadow-lg) !important;
+  font-family: var(--font-body); font-size: var(--fs-14) !important; max-width: 380px !important;
+}
