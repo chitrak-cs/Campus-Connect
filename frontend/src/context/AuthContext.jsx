@@ -65,6 +65,15 @@ export const AuthProvider = ({ children }) => {
     return user;
   }, []);
 
+  useEffect(() => {
+    const onForcedLogout = () => {
+      setUser(null);
+      disconnectSocket();
+    };
+    window.addEventListener('auth:logout', onForcedLogout);
+    return () => window.removeEventListener('auth:logout', onForcedLogout);
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem(tokenKey(tabId));
     localStorage.removeItem(userKey(tabId));

@@ -3,6 +3,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const multer = require('multer');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { initDB, pool } = require('./config/db');
@@ -205,6 +206,28 @@ app.get('/api/announcements', async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
+});
+
+// ─── Error handling ──────────────────────────────────────────
+app.use('/api', (req, res) => res.status(404).json({ message: 'Not found' }));
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    const tooBig = err.code === 'LIMIT_FILE_SIZE';
+    return res.status(tooBig ? 413 : 400).json({
+      message: tooBig ? 'File too large (max 50 MB)' : err.message,
+    });
+  }
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error('Unhandled error:', err);
+  res.status(status).json({
+    message: status >= 500 ? 'Internal server error' : err.message,
+  });
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
 });
 
 // ─── Start Server ────────────────────────────────────────────

@@ -20,7 +20,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const url = err.config?.url || '';
+    const isAuthCall = /^\/auth\/(login|register|verify-otp|forgot|reset|resend)/.test(url);
+    if (err.response?.status === 401 && !isAuthCall) {
       try {
         const tabId = getTabId()
         localStorage.removeItem(tokenKey(tabId))
@@ -28,7 +30,7 @@ api.interceptors.response.use(
       } catch (e) {
         console.error('Failed to remove token', e);
       }
-      window.location.href = '/login'
+      window.dispatchEvent(new Event('auth:logout'))
     }
     return Promise.reject(err);
   }

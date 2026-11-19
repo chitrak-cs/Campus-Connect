@@ -74,7 +74,7 @@ export default function LoginPage() {
       </div>
 
         <div className="auth-right">
-        <form className="auth-form form-card" onSubmit={handle}>
+        <form className="auth-form form-card" onSubmit={otpStage ? handleVerify : handle}>
           <h2>Sign In</h2>
           <p className="form-note">Use your university email to continue</p>
 
@@ -103,7 +103,7 @@ export default function LoginPage() {
                 <input className="form-input" value={code} onChange={e => setCode(e.target.value)} placeholder="123456" />
                 <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                   <button className="btn btn-outline btn-sm" type="button" onClick={() => { setOtpStage(false); setCode('') }}>Back</button>
-                  <button className="btn btn-primary btn-sm" onClick={handleVerify} disabled={loading || !code}>Verify</button>
+                  <button className="btn btn-primary btn-sm" type="submit" disabled={loading || !code}>Verify</button>
                 </div>
               </div>
             )}

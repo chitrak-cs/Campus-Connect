@@ -3,10 +3,14 @@ require('dotenv').config();
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URI,
-  ssl: {
-    rejectUnauthorized: false, // required for Neon
-  },
+  ssl: { rejectUnauthorized: true },
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
+
+// Neon drops idle connections; without this handler the process can crash.
+pool.on('error', (err) => console.error('PG pool error (client dropped):', err.message));
 
 
 const initDB = async () => {

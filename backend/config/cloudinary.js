@@ -24,7 +24,11 @@ const upload = multer({
       'image/png',
     ];
     if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error('File type not allowed. Only PDF, Word, PowerPoint, and images.'));
+    else {
+      const e = new Error('File type not allowed. Only PDF, Word, PowerPoint, and images.');
+      e.status = 400;
+      cb(e);
+    }
   },
 });
 

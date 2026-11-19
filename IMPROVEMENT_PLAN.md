@@ -127,37 +127,37 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
 
 ## Phase 1: Fix what's broken in production (C1–C7)
 
-- [ ] **1.1 [C1] Socket URL.** In `frontend/src/utils/socket.js`, derive the URL from env:
+- [x] **1.1 [C1] Socket URL.** In `frontend/src/utils/socket.js`, derive the URL from env:
   ```js
   const apiUrl = import.meta.env.VITE_API_URL || '/api'
   const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || new URL(apiUrl, window.location.origin).origin
   socket = io(SOCKET_URL, { auth: { token }, transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 1000 })
   ```
   Also fix `connectSocket`: if a socket exists but is disconnected, update `socket.auth` and `connect()` instead of creating a duplicate.
-- [ ] **1.2 [C2] SPA rewrites.** Create `frontend/vercel.json`:
+- [x] **1.2 [C2] SPA rewrites.** Create `frontend/vercel.json`:
   ```json
   { "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }] }
   ```
   (Security headers get added to this file in 2.10.)
-- [ ] **1.3 [C3] Email over HTTPS.** Create `backend/utils/mailer.js` exporting `sendEmail({ to, subject, html, text })`:
+- [x] **1.3 [C3] Email over HTTPS.** Create `backend/utils/mailer.js` exporting `sendEmail({ to, subject, html, text })`:
   - If `BREVO_API_KEY` is set: `POST https://api.brevo.com/v3/smtp/email` with the global `fetch` (Node ≥ 18), header `api-key`, body `{ sender: { email: MAIL_FROM, name: MAIL_FROM_NAME }, to: [{ email: to }], subject, htmlContent: html, textContent: text }`. Throw on a non-2xx response.
   - Else if SMTP vars are set: keep nodemailer (useful locally).
   - Else, **only when `NODE_ENV !== 'production'`**: `console.log` the email to the terminal for dev.
   - **Never log OTP codes in production.**
   - Replace `sendOtpEmail` internals with `sendEmail`. Build one branded HTML template (`backend/utils/emailTemplates.js`) with navy header, gold accent, code in large monospace and the expiry note.
   - If sending fails in production, `register`/`login` must return **502 `{ message: 'Could not send verification email, try again' }`** instead of pretending it worked.
-- [ ] **1.4 [C4] Pool hardening** in `backend/config/db.js`:
+- [x] **1.4 [C4] Pool hardening** in `backend/config/db.js`:
   ```js
   const pool = new Pool({ connectionString: process.env.DATABASE_URI, ssl: { rejectUnauthorized: true }, max: 5, idleTimeoutMillis: 30000, connectionTimeoutMillis: 10000 })
   pool.on('error', (err) => console.error('PG pool error (client dropped):', err.message))
   ```
   If `rejectUnauthorized: true` fails against Neon on the dev branch, revert to `false` and log it in §13.
-- [ ] **1.5 [C5] Central error handling** at the end of `server.js` (after the routes):
+- [x] **1.5 [C5] Central error handling** at the end of `server.js` (after the routes):
   - `app.use('/api', (req, res) => res.status(404).json({ message: 'Not found' }))`
   - An error handler that maps `multer.MulterError` (e.g. `LIMIT_FILE_SIZE` → 413 "File too large (max 50 MB)") and the file-filter error → 400; everything else → `status || 500` with a generic message when `>= 500`. Log the full error server-side only.
   - Add `process.on('unhandledRejection', ...)` logging.
-- [ ] **1.6 [C6]** `LoginPage.jsx`: restructure so the OTP stage is its **own `<form onSubmit={handleVerify}>`** (or give the Verify button `type="submit"` and switch the form's `onSubmit` by stage, as `RegisterPage` does). The Back button stays `type="button"`.
-- [ ] **1.7 [C7]** `api.js` 401 interceptor: skip the redirect when `err.config.url` starts with `/auth/login`, `/auth/register`, `/auth/verify-otp`, `/auth/forgot`, `/auth/reset` or `/auth/resend`. On other 401s, clear the auth keys and `navigate` to `/login?expired=1` without a hard reload (use a small event emitter or `window.dispatchEvent(new Event('auth:logout'))` that `AuthContext` listens for).
+- [x] **1.6 [C6]** `LoginPage.jsx`: restructure so the OTP stage is its **own `<form onSubmit={handleVerify}>`** (or give the Verify button `type="submit"` and switch the form's `onSubmit` by stage, as `RegisterPage` does). The Back button stays `type="button"`.
+- [x] **1.7 [C7]** `api.js` 401 interceptor: skip the redirect when `err.config.url` starts with `/auth/login`, `/auth/register`, `/auth/verify-otp`, `/auth/forgot`, `/auth/reset` or `/auth/resend`. On other 401s, clear the auth keys and `navigate` to `/login?expired=1` without a hard reload (use a small event emitter or `window.dispatchEvent(new Event('auth:logout'))` that `AuthContext` listens for).
 
 ✅ **Verify:** locally, chat works across two browsers (normal + incognito). `npm run build && npx vite preview`, then open `/files` directly and it loads. A wrong password shows a toast with no reload. Clicking Verify sends exactly one request. Uploading a 60 MB file returns a JSON 413.
 
@@ -482,9 +482,13 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | Date | Task | What changed vs plan, and why |
 |---|---|---|
 | 2026-11-20 | 0.7 | Backend verified against Neon `dev` (health + login 401 JSON). Frontend dev server not launched in a browser; verified via build in Phase 1. |
+| 2026-11-20 | 1.7 | On a non-auth 401 the app clears auth and dispatches `auth:logout`; `AuthContext` sets `user=null` and the route guard redirects to `/login` (no hard reload). The `?expired=1` param is not added yet; the banner belongs to 5.6. |
+| 2026-11-20 | 1.3 | Brevo path coded but untested (needs H2 key). Locally the SMTP vars in `.env` are used. Dev console fallback exists for when nothing is configured. |
+| 2026-11-20 | 1.4 | `rejectUnauthorized: true` works against Neon dev. |
+| 2026-11-20 | Phase 1 verify | Verified: backend boots, JSON 404, multer limit maps to 413 (isolated test), frontend `npm run build` passes. NOT yet verified: two-browser chat, `vite preview` on `/files`, wrong-password toast, single Verify request, real 60 MB upload. Needs a browser session. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
 
-- Phase 0: ☐  Phase 1: ☐  Phase 2: ☐  Phase 3: ☐  Phase 4: ☐  Phase 5: ☐
+- Phase 0: ☑ (0.7 partial)  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☐  Phase 3: ☐  Phase 4: ☐  Phase 5: ☐
 - Phase 6: ☐  Phase 7: ☐  Phase 8: ☐  Phase 9: ☐  Phase 10: ☐

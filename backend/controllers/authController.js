@@ -2,7 +2,8 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { pool } = require('../config/db');
-const nodemailer = require('nodemailer');
+const { sendEmail } = require('../utils/mailer');
+const { otpEmail } = require('../utils/emailTemplates');
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -41,76 +42,11 @@ const createOtp = async (userId, purpose = 'login', ttlMinutes = 5) => {
   return { id, otp, expiresAt };
 };
 
-// ✅ Send OTP Email
+// ✅ Send OTP Email (never logs the code in production)
 const sendOtpEmail = async (toEmail, otp, opts = {}) => {
-  const host = process.env.SMTP_HOST || process.env.EMAIL_HOST;
-  const port = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587', 10);
-  const user = process.env.SMTP_USER || process.env.EMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-  const secureFlag =
-    process.env.SMTP_SECURE === 'true' ||
-    process.env.EMAIL_SECURE === 'true' ||
-    port === 465;
-
-  const from =
-    process.env.FROM_EMAIL ||
-    process.env.EMAIL_FROM ||
-    `no-reply@${host || 'Jadavpur.local'}`;
-
-  try {
-    let transporter;
-    let usedTestAccount = false;
-
-    if (host && user && pass) {
-      transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: secureFlag,
-        auth: { user, pass },
-      });
-    } else {
-      const testAcct = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: testAcct.smtp.host,
-        port: testAcct.smtp.port,
-        secure: testAcct.smtp.secure,
-        auth: { user: testAcct.user, pass: testAcct.pass },
-      });
-      usedTestAccount = true;
-    }
-
-    const info = await transporter.sendMail({
-      from,
-      to: toEmail,
-      subject: opts.subject || 'Your campus verification code',
-      text:
-        opts.text ||
-        `Your verification code is: ${otp}. It expires in ${
-          opts.ttl || 5
-        } minutes.`,
-      html: `
-        <div style="font-family: Arial; text-align:center;">
-          <h2>Verification Code</h2>
-          <h1>${otp}</h1>
-          <p>Expires in ${opts.ttl || 5} minutes</p>
-        </div>
-      `,
-    });
-
-    console.log(`Sent OTP email to ${toEmail}: ${info.messageId}`);
-
-    if (usedTestAccount) {
-      console.log(
-        `[OTP Preview] ${nodemailer.getTestMessageUrl(info)}`
-      );
-    }
-
-    return true;
-  } catch (err) {
-    console.error('Email failed:', err);
-    console.log(`[OTP FALLBACK] ${toEmail}: ${otp}`);
-    return false;
-  }
+  const tpl = otpEmail({ code: otp, ttl: opts.ttl || 10 });
+  await sendEmail({ to: toEmail, ...tpl });
+  return true;
 };
 
 // ✅ Verify OTP
@@ -175,7 +111,12 @@ const register = async (req, res) => {
     );
 
     const { id: registerId, otp } = await createOtp(id, 'register', 10);
-    await sendOtpEmail(email, otp, { ttl: 10 });
+    try {
+      await sendOtpEmail(email, otp, { ttl: 10 });
+    } catch (mailErr) {
+      console.error('OTP email failed:', mailErr.message);
+      return res.status(502).json({ message: 'Could not send verification email, try again' });
+    }
 
     res.status(201).json({
       otpRequired: true,
@@ -211,7 +152,12 @@ const login = async (req, res) => {
 
     if (!user.is_verified) {
       const { id: loginId, otp } = await createOtp(user.id, 'login', 10);
-      await sendOtpEmail(user.email, otp, { ttl: 10 });
+      try {
+        await sendOtpEmail(user.email, otp, { ttl: 10 });
+      } catch (mailErr) {
+        console.error('OTP email failed:', mailErr.message);
+        return res.status(502).json({ message: 'Could not send verification email, try again' });
+      }
       return res.json({ otpRequired: true, loginId });
     }
 
