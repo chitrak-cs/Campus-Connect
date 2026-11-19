@@ -55,8 +55,18 @@ const filesQuery = z.object({
   year: optText(100),
   type: fileTypeEnum.optional(),
   search: optText(100),
+  sort: z.enum(['new', 'downloads']).optional(),
   page: z.string().max(10).optional(),
   limit: z.string().max(10).optional(),
+});
+
+const updateFile = z.object({
+  title: z.string().trim().min(1, 'Title is required').max(255).optional(),
+  description: optNullText(2000),
+  subject: optNullText(150),
+  file_type: fileTypeEnum.optional(),
+  department: optNullText(100),
+  year: optNullText(100),
 });
 
 const createGroup = z.object({
@@ -93,7 +103,7 @@ const adminUpdateUser = z.object({
 const chatContent = z.string().trim().min(1).max(2000);
 
 module.exports = {
-  register, login, verifyOtp, resendOtp, updateProfile, uploadFields, filesQuery,
+  register, login, verifyOtp, resendOtp, updateProfile, uploadFields, filesQuery, updateFile,
   createGroup, joinByCode, announcement, adminCreateUser, adminUpdateUser,
   chatContent, uuid,
 };

@@ -1,192 +1,148 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { FileText, Users, MessageSquare, Download, ArrowRight, Upload, AlertCircle, Megaphone, FolderOpen } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import api from '../utils/api'
-import { FileText, Users, MessageSquare, Download, ArrowRight, TrendingUp, AlertCircle, Info, AlertTriangle } from 'lucide-react'
+import { fileSize } from '../utils/format'
+import StatCard from '../components/StatCard'
+import FileTypeIcon from '../components/FileTypeIcon'
+import { PageHeader, Card, Button, EmptyState, SkeletonList, PriorityBadge } from '../components/ui'
+import '../styles/pages/dashboard.css'
 
-function StatCard({ icon: Icon, label, value, color, bg }) {
-  return (
-    <div className="stat-card">
-      <div className="stat-icon" style={{ background: bg }}>
-        <Icon size={22} color={color} />
-      </div>
-      <div>
-        <div className="stat-label">{label}</div>
-        <div className="stat-value">{value ?? '—'}</div>
-      </div>
-    </div>
-  )
-}
-
-const priorityIcon = { high: AlertCircle, medium: Info, low: AlertTriangle }
-const priorityColor = { high: 'var(--red)', medium: 'var(--blue)', low: 'var(--gold)' }
+const greetingFor = (h) => (h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening')
 
 export default function Dashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [stats, setStats] = useState(null)
-  const [announcements, setAnnouncements] = useState([])
-  const [recentFiles, setRecentFiles] = useState([])
+  const isAdmin = user?.role === 'admin'
+  const [data, setData] = useState({ stats: null, mine: [], groups: [], announcements: [], recent: [] })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
     Promise.all([
-      user?.role === 'admin' ? api.get('/admin/stats') : Promise.resolve(null),
+      isAdmin ? api.get('/admin/stats') : Promise.resolve(null),
+      api.get('/files/mine'),
+      api.get('/groups'),
       api.get('/announcements'),
-      api.get('/files?limit=5'),
-    ]).then(([statsRes, annRes, filesRes]) => {
-      if (statsRes) setStats(statsRes.data)
-      setAnnouncements(annRes.data.announcements || [])
-      setRecentFiles(filesRes.data.files || [])
-    }).finally(() => setLoading(false))
-  }, [user])
+      api.get('/files', { params: { limit: 5 } }),
+    ]).then(([stats, mine, groups, ann, recent]) => {
+      if (cancelled) return
+      setData({
+        stats: stats?.data || null,
+        mine: mine.data.files || [],
+        groups: (groups.data.groups || []).filter((g) => g.is_member),
+        announcements: ann.data.announcements || [],
+        recent: recent.data.files || [],
+      })
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [isAdmin])
 
-  const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const { stats, mine, groups, announcements, recent } = data
+  const myDownloads = mine.reduce((sum, f) => sum + (f.download_count || 0), 0)
+  const sub = [user?.department, user?.year].filter(Boolean).join(' · ') || 'Welcome to Campus Connect'
 
   return (
     <div>
-      {/* Header */}
-      <div className="page-hero">
-        <h1 className="page-title">{greeting}, {user?.name?.split(' ')[0]} 👋</h1>
-        <p className="page-subtitle">{user?.department} · {user?.year} · Campus Connect</p>
+      <PageHeader serif title={`${greetingFor(new Date().getHours())}, ${user?.name?.split(' ')[0] || ''}`} subtitle={sub}
+        actions={<Button leftIcon={<Upload size={16} />} onClick={() => navigate('/files', { state: { upload: true } })}>Upload material</Button>} />
+
+      <div className="stat-grid">
+        {isAdmin ? (<>
+          <StatCard icon={Users} label="Members" value={stats?.users} tone="info" loading={loading} />
+          <StatCard icon={FileText} label="Approved files" value={stats?.files} tone="success" loading={loading} />
+          <StatCard icon={MessageSquare} label="Messages" value={stats?.messages} tone="accent" loading={loading} />
+          <StatCard icon={Download} label="Downloads" value={stats?.downloads} tone="danger" loading={loading} />
+        </>) : (<>
+          <StatCard icon={Upload} label="My uploads" value={mine.length} tone="info" loading={loading} />
+          <StatCard icon={Download} label="Downloads of my files" value={myDownloads} tone="success" loading={loading} />
+          <StatCard icon={Users} label="Groups joined" value={groups.length} tone="accent" loading={loading} />
+        </>)}
       </div>
 
-      {/* Admin Stats */}
-      {user?.role === 'admin' && stats && (
-        <div className="grid-4" style={{ marginBottom: 28 }}>
-          <StatCard icon={Users} label="Total Users" value={stats.users} color="var(--blue)" bg="rgba(26,95,168,0.1)" />
-          <StatCard icon={FileText} label="Approved Files" value={stats.files} color="var(--green)" bg="rgba(26,122,74,0.1)" />
-          <StatCard icon={MessageSquare} label="Messages" value={stats.messages} color="var(--gold)" bg="rgba(201,168,76,0.12)" />
-          <StatCard icon={Download} label="Downloads" value={stats.downloads} color="#8B4A9C" bg="rgba(139,74,156,0.1)" />
-        </div>
-      )}
-
-      {user?.role === 'admin' && stats?.pending > 0 && (
-        <div style={{ background: 'rgba(192,57,43,0.06)', border: '1px solid rgba(192,57,43,0.2)', borderRadius: 'var(--radius)', padding: '12px 16px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}
-          onClick={() => navigate('/admin')}>
-          <AlertCircle size={16} color="var(--red)" />
-          <span style={{ fontSize: 14, color: 'var(--red)', fontWeight: 500 }}>
-            {stats.pending} file{stats.pending > 1 ? 's' : ''} pending approval
+      {isAdmin && (stats?.pending > 0 || stats?.pendingRoleRequests > 0) && (
+        <button type="button" className="alert alert--danger" onClick={() => navigate('/admin')}>
+          <AlertCircle size={16} aria-hidden="true" />
+          <span>
+            {[stats.pending > 0 && `${stats.pending} file${stats.pending > 1 ? 's' : ''} pending approval`,
+              stats.pendingRoleRequests > 0 && `${stats.pendingRoleRequests} faculty request${stats.pendingRoleRequests > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}
           </span>
-          <ArrowRight size={14} color="var(--red)" style={{ marginLeft: 'auto' }} />
-        </div>
+          <ArrowRight size={14} aria-hidden="true" style={{ marginLeft: 'auto' }} />
+        </button>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
-        {/* Recent Files */}
-        <div>
-          <div className="flex-between" style={{ marginBottom: 14 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700 }}>Recent Files</h2>
-            <button className="btn btn-ghost btn-sm" onClick={() => navigate('/files')} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              View all <ArrowRight size={14} />
-            </button>
-          </div>
-          <div className="recent-list">
-            {loading ? (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {[1,2,3].map(i => (
-                  <div key={i} className="file-card" style={{ height: 84, alignItems: 'center' }}>
-                    <div className="file-thumb skeleton" style={{ width: 64, height: 64, borderRadius: 10 }} />
-                    <div style={{ flex: 1 }}>
-                      <div className="skeleton" style={{ height: 14, width: '60%', borderRadius: 6 }} />
-                      <div className="skeleton" style={{ height: 12, width: '40%', marginTop: 8, borderRadius: 6 }} />
-                    </div>
-                    <div style={{ width: 70 }}>
-                      <div className="skeleton" style={{ height: 12, width: 40, borderRadius: 6, marginLeft: 'auto' }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : recentFiles.length === 0 ? (
-              <div className="empty-state card">
-                <FileText size={48} className="empty-icon" />
-                <div className="empty-title">No files yet</div>
-                <div className="empty-text">Upload your study materials and they'll appear here for quick access.</div>
-                <div style={{ marginTop: 12 }}>
-                  <button className="btn btn-primary" onClick={() => navigate('/files')}>Upload Material</button>
-                </div>
-              </div>
+      <div className="dash">
+        <div className="dash__col">
+          <section aria-labelledby="recent-h">
+            <div className="section-head">
+              <h2 id="recent-h">Recent materials</h2>
+              <button type="button" className="link-btn" onClick={() => navigate('/files')}>View all <ArrowRight size={14} aria-hidden="true" /></button>
+            </div>
+            {loading ? <SkeletonList rows={3} /> : recent.length === 0 ? (
+              <Card><EmptyState icon={FolderOpen} title="No files yet" text="Upload study materials and they'll appear here once approved."
+                action={<Button onClick={() => navigate('/files', { state: { upload: true } })}>Upload material</Button>} /></Card>
             ) : (
-              <div style={{ display: 'grid', gap: 12 }}>
-                {recentFiles.map(f => (
-                  <div key={f.id} className="file-card">
-                    <div className="file-thumb" style={{
-                      background: f.file_type === 'paper' ? 'linear-gradient(135deg, rgba(192,57,43,0.12), rgba(192,57,43,0.04))' : 'linear-gradient(135deg, rgba(26,95,168,0.12), rgba(26,95,168,0.04))'
-                    }}>
-                      <div style={{ fontSize: 12, fontWeight: 800, color: f.file_type === 'paper' ? 'var(--red)' : 'var(--blue)' }}>{f.file_type === 'paper' ? 'EX' : 'NT'}</div>
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--gray-900)' }} className="truncate">{f.title}</div>
-                      <div className="file-meta" style={{ marginTop: 6 }}>
-                        <span style={{ color: 'var(--gray-500)' }}>{f.department}</span>
-                        <span style={{ margin: '0 6px', color: 'var(--gray-300)' }}>·</span>
-                        <span style={{ color: 'var(--gray-500)' }}>{f.year}</span>
-                        <span style={{ margin: '0 6px', color: 'var(--gray-300)' }}>·</span>
-                        <span style={{ color: 'var(--gray-500)' }}>by {f.uploader_name}</span>
+              <div className="stack">
+                {recent.map((f) => (
+                  <div key={f.id} className="row-card">
+                    <FileTypeIcon file={f} />
+                    <div className="row-card__main">
+                      <div className="row-card__title">{f.title}</div>
+                      <div className="row-card__meta">
+                        {[f.subject, f.department, f.year].filter(Boolean).join(' · ')}<span className="dot-sep" />by {f.uploader_name}{fileSize(f) && <><span className="dot-sep" />{fileSize(f)}</>}
                       </div>
-                      {f.tags && f.tags.length > 0 && (
-                        <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                          {f.tags.slice(0,3).map(t => <span key={t} className="badge badge-gray">{t}</span>)}
-                        </div>
-                      )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, minWidth: 90 }}>
-                      <div style={{ color: 'var(--gray-400)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Download size={12} /> <span>{f.download_count}</span>
-                      </div>
-                      <button className="btn btn-ghost btn-sm" onClick={() => navigate('/files')}>View</button>
-                    </div>
+                    <span className="row-card__meta" title="Downloads"><Download size={13} aria-hidden="true" style={{ verticalAlign: '-2px' }} /> {f.download_count}</span>
+                    <Button size="sm" variant="secondary" onClick={() => navigate('/files')}>View</Button>
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </section>
+
+          <section aria-labelledby="groups-h">
+            <div className="section-head">
+              <h2 id="groups-h">My groups</h2>
+              <button type="button" className="link-btn" onClick={() => navigate('/groups')}>Browse groups <ArrowRight size={14} aria-hidden="true" /></button>
+            </div>
+            {loading ? <SkeletonList rows={2} height={56} /> : groups.length === 0 ? (
+              <Card><EmptyState icon={Users} title="You haven't joined a group" text="Join a study group to chat and share with classmates."
+                action={<Button variant="secondary" onClick={() => navigate('/groups')}>Find a group</Button>} /></Card>
+            ) : (
+              <div className="stack">
+                {groups.map((g) => (
+                  <button key={g.id} type="button" className="row-card" style={{ textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
+                    onClick={() => navigate('/chat', { state: { groupId: g.id } })}>
+                    <span className="group-dot" style={{ background: g.avatar_color }}>{g.name[0].toUpperCase()}</span>
+                    <div className="row-card__main">
+                      <div className="row-card__title">{g.name}</div>
+                      <div className="row-card__meta">{g.member_count} member{g.member_count === 1 ? '' : 's'}{g.department ? ` · ${g.department}` : ''}</div>
+                    </div>
+                    <span className="link-btn">Open chat <ArrowRight size={14} aria-hidden="true" /></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
-        {/* Announcements */}
-        <div>
-          <div className="flex-between" style={{ marginBottom: 14 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700 }}>Announcements</h2>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {announcements.length === 0 ? (
-              <div className="card" style={{ textAlign: 'center', padding: '24px', color: 'var(--gray-400)', fontSize: 14 }}>
-                No announcements
-              </div>
-            ) : announcements.map(a => {
-              const Icon = priorityIcon[a.priority] || Info
-              return (
-                <div key={a.id} className={`announcement-card ${a.priority}`}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
-                    <Icon size={14} color={priorityColor[a.priority] || 'var(--gold)'} style={{ marginTop: 2, flexShrink: 0 }} />
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>{a.title}</div>
-                  </div>
-                  <div style={{ fontSize: 13, color: 'var(--gray-600)', lineHeight: 1.5 }}>{a.content}</div>
-                  <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 8 }}>
-                    {a.creator_name} · {new Date(a.created_at).toLocaleDateString('en-IN')}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Quick links */}
-          <div style={{ marginTop: 20 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700, marginBottom: 12 }}>Quick Access</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { label: 'Upload Study Material', path: '/files', color: 'var(--navy)' },
-                { label: 'Join a Study Group', path: '/groups', color: 'var(--gold)' },
-                { label: 'Open Campus Chat', path: '/chat', color: 'var(--green)' },
-              ].map(q => (
-                <button key={q.path} onClick={() => navigate(q.path)} className="quick-link-btn" style={{ color: q.color }}>
-                  {q.label} <ArrowRight size={14} />
-                </button>
+        <aside aria-labelledby="ann-h">
+          <div className="section-head"><h2 id="ann-h">Announcements</h2></div>
+          {loading ? <SkeletonList rows={2} height={96} /> : announcements.length === 0 ? (
+            <Card><EmptyState icon={Megaphone} title="No announcements" text="Updates from admins will show up here." /></Card>
+          ) : (
+            <div className="stack">
+              {announcements.map((a) => (
+                <article key={a.id} className={`ann ann--${a.priority}`}>
+                  <div className="ann__top"><h3 className="ann__title">{a.title}</h3><PriorityBadge priority={a.priority} /></div>
+                  <p className="ann__body">{a.content}</p>
+                  <div className="ann__meta">{a.creator_name} · {new Date(a.created_at).toLocaleDateString()}</div>
+                </article>
               ))}
             </div>
-          </div>
-        </div>
+          )}
+        </aside>
       </div>
     </div>
   )

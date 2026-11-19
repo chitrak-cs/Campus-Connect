@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 import './styles/tokens.css'
 import './styles/base.css'
+import './styles/components.css'
 import './styles/toast.css'
 import './styles/legacy.css'
 

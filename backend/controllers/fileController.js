@@ -74,7 +74,7 @@ const uploadFile = async (req, res) => {
 // ✅ GET /api/files
 const getFiles = async (req, res) => {
   try {
-    const { dept, year, type, search } = req.query;
+    const { dept, year, type, search, sort } = req.query;
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
 
@@ -107,14 +107,15 @@ const getFiles = async (req, res) => {
     const queryParams = [...params, limit, offset];
 
     const { rows: files } = await pool.query(
-      `SELECT f.*, u.name AS uploader_name
+      `SELECT f.*, u.name AS uploader_name,
+              EXISTS(SELECT 1 FROM bookmarks b WHERE b.file_id = f.id AND b.user_id = $${params.length + 3}) AS is_bookmarked
        FROM files f
        JOIN users u ON f.uploaded_by = u.id
        WHERE ${where.join(' AND ')}
-       ORDER BY f.created_at DESC
+       ORDER BY ${sort === 'downloads' ? 'f.download_count DESC, f.created_at DESC' : 'f.created_at DESC'}
        LIMIT $${params.length + 1}
        OFFSET $${params.length + 2}`,
-      queryParams
+      [...queryParams, req.user.id]
     );
 
     const { rows: countRows } = await pool.query(
@@ -153,6 +154,84 @@ const getMyFiles = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error fetching your files' });
+  }
+};
+
+// GET /api/files/saved - your bookmarked (approved) files
+const getSavedFiles = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.*, u.name AS uploader_name, TRUE AS is_bookmarked
+       FROM bookmarks b
+       JOIN files f ON f.id = b.file_id
+       JOIN users u ON f.uploaded_by = u.id
+       WHERE b.user_id = $1 AND f.is_approved = TRUE
+       ORDER BY b.created_at DESC
+       LIMIT 200`,
+      [req.user.id]
+    );
+    res.json({ files: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching saved files' });
+  }
+};
+
+// POST /api/files/:id/bookmark
+const addBookmark = async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT id FROM files WHERE id = $1 AND is_approved = TRUE`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'File not found' });
+    await pool.query(
+      `INSERT INTO bookmarks (user_id, file_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [req.user.id, req.params.id]
+    );
+    res.json({ message: 'Saved' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error saving file' });
+  }
+};
+
+// DELETE /api/files/:id/bookmark
+const removeBookmark = async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM bookmarks WHERE user_id = $1 AND file_id = $2`, [req.user.id, req.params.id]);
+    res.json({ message: 'Removed from saved' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error removing bookmark' });
+  }
+};
+
+// PUT /api/files/:id - edit metadata (owner or admin)
+const updateFile = async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT uploaded_by FROM files WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'File not found' });
+    if (rows[0].uploaded_by !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorised to edit this file' });
+    }
+
+    const sets = [];
+    const params = [];
+    for (const col of ['title', 'description', 'subject', 'file_type', 'department', 'year']) {
+      if (req.body[col] !== undefined) {
+        params.push(req.body[col] === '' ? null : req.body[col]);
+        sets.push(`${col} = $${params.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ message: 'Nothing to update' });
+
+    params.push(req.params.id);
+    const { rows: updated } = await pool.query(
+      `UPDATE files SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`,
+      params
+    );
+    res.json({ file: updated[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error updating file' });
   }
 };
 
@@ -253,6 +332,10 @@ module.exports = {
   uploadFile,
   getFiles,
   getMyFiles,
+  getSavedFiles,
+  addBookmark,
+  removeBookmark,
+  updateFile,
   getPendingFiles,
   approveFile,
   deleteFile,

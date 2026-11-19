@@ -1,283 +1,172 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { Upload, Search, LayoutGrid, List, FolderOpen, Bookmark } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import api from '../utils/api'
-import toast from 'react-hot-toast'
-import { Upload, Download, Trash2, Search, FileText, X, Plus, Filter } from 'lucide-react'
+import FileCard from '../components/files/FileCard'
+import UploadModal from '../components/files/UploadModal'
+import PreviewModal from '../components/files/PreviewModal'
+import EditFileModal from '../components/files/EditFileModal'
+import { TYPES, DEPTS, YEARS } from '../components/files/constants'
+import { PageHeader, Button, Tabs, Select, EmptyState, SkeletonList, ConfirmDialog } from '../components/ui'
+import '../styles/pages/files.css'
 
-const TYPES = ['All', 'notes', 'paper', 'assignment', 'other']
-const DEPTS = ['All', 'CSE', 'ECE', 'EEE', 'ME', 'CE', 'BCA', 'MCA', 'MBA', 'BBA', 'Other']
-const YEARS = ['All', '1st Year', '2nd Year', '3rd Year', '4th Year', 'PG 1st Year', 'PG 2nd Year']
-
-const typeColors = {
-  notes: { bg: 'rgba(26,95,168,0.1)', color: 'var(--blue)', label: 'NT' },
-  paper: { bg: 'rgba(192,57,43,0.1)', color: 'var(--red)', label: 'EX' },
-  assignment: { bg: 'rgba(26,122,74,0.1)', color: 'var(--green)', label: 'AS' },
-  other: { bg: 'rgba(201,168,76,0.12)', color: '#7a5f1a', label: 'OT' },
-}
-
-function UploadModal({ onClose, onSuccess }) {
-  const [form, setForm] = useState({ title: '', description: '', file_type: 'notes', department: '', year: '', subject: '' })
-  const [file, setFile] = useState(null)
-  const [drag, setDrag] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const inputRef = useRef()
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  const submit = async (e) => {
-    e.preventDefault()
-    if (!file) return toast.error('Please select a file')
-    const fd = new FormData()
-    Object.entries(form).forEach(([k, v]) => v && fd.append(k, v))
-    fd.append('file', file)
-    setLoading(true)
-    try {
-      const res = await api.post('/files/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      toast.success(res.data.message)
-      onSuccess()
-      onClose()
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Upload failed')
-    } finally { setLoading(false) }
-  }
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal">
-        <div className="modal-header">
-          <span className="modal-title">Upload Study Material</span>
-          <button className="btn btn-ghost btn-icon" onClick={onClose}><X size={18} /></button>
-        </div>
-        <form onSubmit={submit}>
-          <div className="modal-body">
-            {/* Drop zone */}
-            <div className={`upload-zone ${drag ? 'drag' : ''}`}
-              onDragOver={e => { e.preventDefault(); setDrag(true) }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={e => { e.preventDefault(); setDrag(false); setFile(e.dataTransfer.files[0]) }}
-              onClick={() => inputRef.current.click()}>
-              <input ref={inputRef} type="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.png" style={{ display: 'none' }}
-                onChange={e => setFile(e.target.files[0])} />
-              <div className="upload-zone-icon"><Upload size={32} /></div>
-              {file ? (
-                <div>
-                  <div style={{ fontWeight: 500, color: 'var(--navy)' }}>{file.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--gray-500)' }}>{(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ fontWeight: 500, color: 'var(--gray-700)' }}>Drop file here or click to browse</div>
-                  <div style={{ fontSize: 12, color: 'var(--gray-400)', marginTop: 4 }}>PDF, Word, PowerPoint — Max 50MB</div>
-                </div>
-              )}
-            </div>
-            <div className="form-group">
-              <label className="form-label">Title *</label>
-              <input className="form-input" placeholder="e.g. Data Structures Unit 3 Notes" value={form.title}
-                onChange={e => set('title', e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Subject</label>
-              <input className="form-input" placeholder="e.g. Data Structures & Algorithms" value={form.subject}
-                onChange={e => set('subject', e.target.value)} />
-            </div>
-            <div className="grid-2" style={{ gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Type</label>
-                <select className="form-select" value={form.file_type} onChange={e => set('file_type', e.target.value)}>
-                  <option value="notes">Notes</option>
-                  <option value="paper">Exam Paper</option>
-                  <option value="assignment">Assignment</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Department</label>
-                <select className="form-select" value={form.department} onChange={e => set('department', e.target.value)}>
-                  <option value="">Select</option>
-                  {DEPTS.slice(1).map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Year</label>
-              <select className="form-select" value={form.year} onChange={e => set('year', e.target.value)}>
-                <option value="">Select year</option>
-                {YEARS.slice(1).map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Description (optional)</label>
-              <textarea className="form-input" placeholder="Brief description of the content..." value={form.description}
-                onChange={e => set('description', e.target.value)} style={{ minHeight: 70 }} />
-            </div>
-          </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? <><span className="spinner" style={{ width: 16, height: 16 }} /> Uploading...</> : <><Upload size={16} /> Upload File</>}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
+const readView = () => { try { return localStorage.getItem('cc_files_view') === 'list' ? 'list' : 'grid' } catch { return 'grid' } }
 
 export default function FilesPage() {
   const { user } = useAuth()
-  const [files, setFiles] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showUpload, setShowUpload] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isPrivileged = ['admin', 'faculty'].includes(user?.role)
+
+  const [tab, setTab] = useState('all')
+  const [view, setView] = useState(readView)
   const [search, setSearch] = useState('')
-  const [filters, setFilters] = useState({ type: 'All', dept: 'All', year: 'All' })
+  const [debounced, setDebounced] = useState('')
+  const [type, setType] = useState('')
+  const [dept, setDept] = useState('')
+  const [year, setYear] = useState('')
+  const [sort, setSort] = useState('new')
 
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [files, setFiles] = useState([])
+  const [page, setPage] = useState(1)
+  const [pages, setPages] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const fetchFiles = () => setReloadKey(k => k + 1) // used after upload
 
-  // Debounce the search box
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search.trim()), 400)
-    return () => clearTimeout(t)
-  }, [search])
+  const [showUpload, setShowUpload] = useState(!!location.state?.upload)
+  const [preview, setPreview] = useState(null)
+  const [editing, setEditing] = useState(null)
+  const [deleting, setDeleting] = useState(null)
 
-  // One fetch effect for filters, search and manual reloads (ignores stale responses)
+  // Opened from the dashboard's "Upload material": consume the navigation state
+  useEffect(() => { if (location.state?.upload) navigate('/files', { replace: true, state: null }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { try { localStorage.setItem('cc_files_view', view) } catch { /* ignore */ } }, [view])
+  useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 400); return () => clearTimeout(t) }, [search])
+
+  // One fetch effect for tab, filters, sort, search and manual reloads
   useEffect(() => {
     let cancelled = false
-    const params = {}
-    if (debouncedSearch) params.search = debouncedSearch
-    if (filters.type !== 'All') params.type = filters.type
-    if (filters.dept !== 'All') params.dept = filters.dept
-    if (filters.year !== 'All') params.year = filters.year
     setLoading(true)
-    api.get('/files', { params })
-      .then(res => { if (!cancelled) setFiles(res.data.files || []) })
-      .catch(() => { if (!cancelled) toast.error('Failed to load files') })
+    const req = tab === 'all'
+      ? api.get('/files', { params: { search: debounced || undefined, type: type || undefined, dept: dept || undefined, year: year || undefined, sort, page: 1, limit: 20 } })
+      : api.get(tab === 'mine' ? '/files/mine' : '/files/saved')
+    req.then((res) => {
+      if (cancelled) return
+      setFiles(res.data.files || []); setPage(1); setPages(res.data.pages || 1)
+    }).catch(() => { if (!cancelled) toast.error('Failed to load files') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [filters, debouncedSearch, reloadKey])
+  }, [tab, debounced, type, dept, year, sort, reloadKey])
+
+  const loadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const res = await api.get('/files', { params: { search: debounced || undefined, type: type || undefined, dept: dept || undefined, year: year || undefined, sort, page: page + 1, limit: 20 } })
+      setFiles((prev) => [...prev, ...(res.data.files || [])]); setPage(page + 1)
+    } catch { toast.error('Could not load more') } finally { setLoadingMore(false) }
+  }
+
+  // My uploads / Saved are small lists: filter them in the browser
+  const visible = useMemo(() => {
+    if (tab === 'all') return files
+    const q = debounced.toLowerCase()
+    return files.filter((f) =>
+      (!q || f.title.toLowerCase().includes(q) || (f.subject || '').toLowerCase().includes(q)) &&
+      (!type || f.file_type === type) && (!dept || f.department === dept) && (!year || f.year === year))
+  }, [files, tab, debounced, type, dept, year])
+
+  const patchFile = useCallback((id, patch) => setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f))), [])
 
   const handleDownload = async (f) => {
     try {
       const res = await api.post(`/files/${f.id}/download`)
-      window.open(res.data.url, '_blank')
-      setFiles(prev => prev.map(fi => fi.id === f.id ? { ...fi, download_count: fi.download_count + 1 } : fi))
+      window.open(res.data.url, '_blank', 'noopener')
+      patchFile(f.id, { download_count: (f.download_count || 0) + 1 })
     } catch { toast.error('Download failed') }
   }
 
-  const handleDelete = async (id) => {
-    if (!confirm('Delete this file?')) return
+  const toggleSave = async (f) => {
+    const next = !f.is_bookmarked
+    patchFile(f.id, { is_bookmarked: next })           // optimistic
     try {
-      await api.delete(`/files/${id}`)
-      toast.success('File deleted')
-      setFiles(prev => prev.filter(f => f.id !== id))
-    } catch (err) { toast.error(err.response?.data?.message || 'Delete failed') }
+      await (next ? api.post(`/files/${f.id}/bookmark`) : api.delete(`/files/${f.id}/bookmark`))
+      if (!next && tab === 'saved') setFiles((prev) => prev.filter((x) => x.id !== f.id))
+    } catch { patchFile(f.id, { is_bookmarked: !next }); toast.error('Could not update saved files') }
   }
+
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/files/${deleting.id}`)
+      setFiles((prev) => prev.filter((f) => f.id !== deleting.id)); toast.success('File deleted')
+    } catch (err) { toast.error(err.response?.data?.message || 'Delete failed') }
+    setDeleting(null)
+  }
+
+  const filtersActive = !!(debounced || type || dept || year)
+  const clearFilters = () => { setSearch(''); setType(''); setDept(''); setYear('') }
+  const emptyCopy = {
+    all: { title: filtersActive ? 'No files match your filters' : 'No files yet', text: filtersActive ? 'Try removing a filter or searching for something else.' : 'Be the first to share study material.' },
+    mine: { title: filtersActive ? 'No uploads match your filters' : "You haven't uploaded anything", text: 'Files you upload appear here, including ones waiting for approval.' },
+    saved: { title: filtersActive ? 'No saved files match' : 'Nothing saved yet', text: 'Tap the bookmark on a file to keep it here for later.' },
+  }[tab]
 
   return (
     <div>
-      <div className="flex-between" style={{ marginBottom: 24 }}>
-        <div>
-          <h1 className="page-title">Files & Notes</h1>
-          <p className="page-subtitle">Study materials uploaded by students and faculty</p>
+      <PageHeader title="Files" subtitle="Notes, papers and assignments shared by your campus"
+        actions={<Button leftIcon={<Upload size={16} />} onClick={() => setShowUpload(true)}>Upload material</Button>} />
+
+      <Tabs label="File lists" value={tab} onChange={setTab} tabs={[{ id: 'all', label: 'All files' }, { id: 'mine', label: 'My uploads' }, { id: 'saved', label: 'Saved' }]} />
+
+      <div className="ftools" role="search">
+        <label className="ftools__search">
+          <Search size={16} aria-hidden="true" />
+          <span className="sr-only">Search files</span>
+          <input type="search" placeholder="Search by title or subject" value={search} onChange={(e) => setSearch(e.target.value)} />
+        </label>
+        <div className="ftools__chips" role="group" aria-label="File type">
+          {TYPES.map((t) => <button key={t.value} type="button" className={`chip ${type === t.value ? 'is-active' : ''}`} aria-pressed={type === t.value} onClick={() => setType(t.value)}>{t.label}</button>)}
         </div>
-        <button className="btn btn-primary" onClick={() => setShowUpload(true)}>
-          <Plus size={16} /> Upload File
-        </button>
+        <div className="ftools__selects">
+          <Select aria-label="Department" value={dept} onChange={(e) => setDept(e.target.value)}><option value="">All departments</option>{DEPTS.map((d) => <option key={d}>{d}</option>)}</Select>
+          <Select aria-label="Year" value={year} onChange={(e) => setYear(e.target.value)}><option value="">All years</option>{YEARS.map((y) => <option key={y}>{y}</option>)}</Select>
+          {tab === 'all' && <Select aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value)}><option value="new">Newest</option><option value="downloads">Most downloaded</option></Select>}
+          <div className="vtoggle" role="group" aria-label="Layout">
+            <button type="button" aria-pressed={view === 'grid'} aria-label="Grid view" onClick={() => setView('grid')}><LayoutGrid size={16} /></button>
+            <button type="button" aria-pressed={view === 'list'} aria-label="List view" onClick={() => setView('list')}><List size={16} /></button>
+          </div>
+        </div>
       </div>
 
-      {/* Search + Filters */}
-      <div style={{ background: '#fff', border: '1px solid var(--gray-100)', borderRadius: 'var(--radius-lg)', padding: '16px 18px', marginBottom: 20 }}>
-        <div style={{ position: 'relative', marginBottom: 14 }}>
-          <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)' }} />
-          <input className="form-input" placeholder="Search by title or subject..." style={{ paddingLeft: 38 }}
-            value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 500 }}>TYPE</span>
-            <div className="filter-bar">
-              {TYPES.map(t => (
-                <button key={t} className={`filter-chip ${filters.type === t ? 'active' : ''}`}
-                  onClick={() => setFilters(f => ({ ...f, type: t }))}>
-                  {t === 'All' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
+      <div id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        {loading ? <SkeletonList rows={4} height={view === 'grid' ? 150 : 84} /> : visible.length === 0 ? (
+          <EmptyState icon={tab === 'saved' ? Bookmark : FolderOpen} title={emptyCopy.title} text={emptyCopy.text}
+            action={filtersActive ? <Button variant="secondary" onClick={clearFilters}>Clear filters</Button> : tab !== 'saved' && <Button onClick={() => setShowUpload(true)}>Upload material</Button>} />
+        ) : (
+          <>
+            <p className="fcount" aria-live="polite">{visible.length} file{visible.length === 1 ? '' : 's'}</p>
+            <div className={`fgrid fgrid--${view}`}>
+              {visible.map((f) => (
+                <FileCard key={f.id} file={f} view={view} showStatus={tab === 'mine'}
+                  canManage={user?.role === 'admin' || f.uploaded_by === user?.id}
+                  onPreview={setPreview} onDownload={handleDownload} onToggleSave={toggleSave} onEdit={setEditing} onDelete={setDeleting} />
               ))}
             </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 500 }}>DEPT</span>
-            <select className="form-select" style={{ width: 'auto', padding: '6px 12px', fontSize: 13 }}
-              value={filters.dept} onChange={e => setFilters(f => ({ ...f, dept: e.target.value }))}>
-              {DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 12, color: 'var(--gray-500)', fontWeight: 500 }}>YEAR</span>
-            <select className="form-select" style={{ width: 'auto', padding: '6px 12px', fontSize: 13 }}
-              value={filters.year} onChange={e => setFilters(f => ({ ...f, year: e.target.value }))}>
-              {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-        </div>
+            {tab === 'all' && page < pages && (
+              <div className="fmore"><Button variant="secondary" loading={loadingMore} onClick={loadMore}>Load more</Button></div>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Files Grid */}
-      {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-          {[1,2,3,4,5,6].map(i => <div key={i} style={{ height: 100, background: '#fff', borderRadius: 'var(--radius-lg)', border: '1px solid var(--gray-100)', animation: 'pulse 1.5s infinite' }} />)}
-        </div>
-      ) : files.length === 0 ? (
-        <div className="empty-state">
-          <FileText size={48} className="empty-icon" />
-          <div className="empty-title">No files found</div>
-          <div className="empty-text">Try changing filters or be the first to upload!</div>
-          <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => setShowUpload(true)}>
-            <Upload size={16} /> Upload Now
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
-          {files.map(f => {
-            const tc = typeColors[f.file_type] || typeColors.other
-            return (
-              <div key={f.id} className="file-card">
-                <div className="file-type-icon" style={{ background: tc.bg, color: tc.color }}>{tc.label}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--navy)' }} className="truncate">{f.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--gray-500)', margin: '3px 0' }}>
-                    {[f.department, f.year, f.subject].filter(Boolean).join(' · ')}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-                    <span className={`badge badge-${f.file_type === 'paper' ? 'red' : f.file_type === 'notes' ? 'blue' : 'gray'}`}>
-                      {f.file_type}
-                    </span>
-                    <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>
-                      <Download size={10} style={{ display: 'inline', marginRight: 2 }} />{f.download_count}
-                    </span>
-                    {f.file_size && <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>{f.file_size}</span>}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 4 }}>
-                    by {f.uploader_name} · {new Date(f.created_at).toLocaleDateString('en-IN')}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-                  <button className="btn btn-outline btn-sm btn-icon" title="Download" onClick={() => handleDownload(f)}>
-                    <Download size={14} />
-                  </button>
-                  {(f.uploaded_by === user?.id || user?.role === 'admin') && (
-                    <button className="btn btn-danger btn-sm btn-icon" title="Delete" onClick={() => handleDelete(f.id)}>
-                      <Trash2 size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {showUpload && <UploadModal onClose={() => setShowUpload(false)} onSuccess={fetchFiles} />}
+      {showUpload && <UploadModal isPrivileged={isPrivileged} onClose={() => setShowUpload(false)} onUploaded={() => setReloadKey((k) => k + 1)} />}
+      {preview && <PreviewModal file={preview} onClose={() => setPreview(null)} onDownload={handleDownload} />}
+      {editing && <EditFileModal file={editing} onClose={() => setEditing(null)} onSaved={(updated) => patchFile(updated.id, updated)} />}
+      <ConfirmDialog open={!!deleting} danger title="Delete this file?" confirmLabel="Delete"
+        message={deleting ? `"${deleting.title}" will be permanently removed and can't be recovered.` : ''}
+        onCancel={() => setDeleting(null)} onConfirm={confirmDelete} />
     </div>
   )
 }
