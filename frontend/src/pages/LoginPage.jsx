@@ -120,10 +120,6 @@ export default function LoginPage() {
             No account?{' '}
             <Link to="/register" style={{ color: 'var(--navy)', fontWeight: 600 }}>Register here</Link>
           </p>
-
-          <div style={{ marginTop: 24, padding: 14, background: 'var(--gray-50)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--gray-500)', textAlign: 'center' }}>
-            Demo: <strong>admin@Jadavpur.ac.in</strong> / <strong>admin123</strong>
-          </div>
         </form>
       </div>
     </div>

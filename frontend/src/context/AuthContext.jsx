@@ -1,27 +1,24 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../utils/api';
 import { connectSocket, disconnectSocket } from '../utils/socket';
-import { getTabId, tokenKey, userKey } from '../utils/tabSession';
+import { getToken, getStoredUser, saveAuth, saveUser, clearAuth, removeLegacyKeys } from '../utils/authStorage';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const tabId = getTabId()
-  const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(userKey(tabId))); } catch { return null; }
-  });
+  const [user, setUser] = useState(() => { removeLegacyKeys(); return getStoredUser(); });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem(tokenKey(tabId));
+    const token = getToken();
     if (token) {
       api.get('/auth/me')
         .then(res => {
           setUser(res.data.user);
-          localStorage.setItem(userKey(tabId), JSON.stringify(res.data.user));
+          saveUser(res.data.user);
           connectSocket(token);
         })
-        .catch(() => { localStorage.removeItem(tokenKey(tabId)); localStorage.removeItem(userKey(tabId)); setUser(null); })
+        .catch(() => { clearAuth(); setUser(null); })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);
@@ -35,8 +32,7 @@ export const AuthProvider = ({ children }) => {
       return res.data;
     }
     const { token, user } = res.data;
-    localStorage.setItem(tokenKey(tabId), token);
-    localStorage.setItem(userKey(tabId), JSON.stringify(user));
+    saveAuth(token, user);
     setUser(user);
     connectSocket(token);
     return user;
@@ -46,8 +42,7 @@ export const AuthProvider = ({ children }) => {
     // send generic id and code; caller may pass purpose via third arg in future
     const res = await api.post('/auth/verify-otp', { id: loginId, code });
     const { token, user } = res.data;
-    localStorage.setItem(tokenKey(tabId), token);
-    localStorage.setItem(userKey(tabId), JSON.stringify(user));
+    saveAuth(token, user);
     setUser(user);
     connectSocket(token);
     return user;
@@ -58,11 +53,19 @@ export const AuthProvider = ({ children }) => {
     // If the server requires OTP verification for registration it will return { otpRequired: true, registerId }
     if (res.data && res.data.otpRequired) return res.data;
     const { token, user } = res.data;
-    localStorage.setItem(tokenKey(tabId), token);
-    localStorage.setItem(userKey(tabId), JSON.stringify(user));
+    saveAuth(token, user);
     setUser(user);
     connectSocket(token);
     return user;
+  }, []);
+
+  // Keep tabs in sync: logging out in one tab logs out the others
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'cc_token' && !e.newValue) { setUser(null); disconnectSocket(); }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   useEffect(() => {
@@ -75,8 +78,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem(tokenKey(tabId));
-    localStorage.removeItem(userKey(tabId));
+    clearAuth();
     setUser(null);
     disconnectSocket();
   }, []);
@@ -84,7 +86,7 @@ export const AuthProvider = ({ children }) => {
   const updateUser = useCallback((updates) => {
     const updated = { ...user, ...updates };
     setUser(updated);
-    localStorage.setItem(userKey(tabId), JSON.stringify(updated));
+    saveUser(updated);
   }, [user]);
 
   return (

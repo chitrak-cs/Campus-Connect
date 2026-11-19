@@ -104,10 +104,6 @@ export default function ChatPage() {
       }
     })
 
-    // Join all group rooms
-    const groupIds = groups.map(g => g.id)
-    if (groupIds.length) socket.emit('join_groups', groupIds)
-
     return () => {
       socket.off('connect'); socket.off('disconnect'); socket.off('online_users')
       socket.off('new_global_message'); socket.off('new_group_message'); socket.off('user_typing')

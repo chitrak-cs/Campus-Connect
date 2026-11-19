@@ -3,8 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
 import { BookOpen } from 'lucide-react'
-import api from '../utils/api'
-import { tokenKey, userKey, getTabId } from '../utils/tabSession'
 
 const DEPTS = ['CSE', 'ECE', 'EEE', 'ME', 'CE', 'BCA', 'MCA', 'MBA', 'BBA', 'Law', 'Pharmacy', 'Other']
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'PG 1st Year', 'PG 2nd Year', 'Faculty']
@@ -15,14 +13,14 @@ export default function RegisterPage() {
   const [otpStage, setOtpStage] = useState(false)
   const [registerId, setRegisterId] = useState(null)
   const [otpCode, setOtpCode] = useState('')
-  const { register } = useAuth()
+  const { register, verifyOtp } = useAuth()
   const navigate = useNavigate()
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handle = async (e) => {
     e.preventDefault()
-    if (form.password.length < 6) return toast.error('Password must be at least 6 characters')
+    if (form.password.length < 8) return toast.error('Password must be at least 8 characters')
     setLoading(true)
     try {
       const res = await register(form)
@@ -30,7 +28,9 @@ export default function RegisterPage() {
       if (res && res.otpRequired) {
         setRegisterId(res.registerId)
         setOtpStage(true)
-        toast.success('OTP sent to your email. Please enter it to complete registration.')
+        toast.success(res.facultyPending
+          ? 'Code sent. Your faculty role will be active once an admin approves it.'
+          : 'OTP sent to your email. Please enter it to complete registration.')
         return
       }
       toast.success('Account created! Welcome to Jadavpur.')
@@ -45,14 +45,9 @@ export default function RegisterPage() {
     if (!otpCode || !registerId) return toast.error('Please enter the OTP sent to your email')
     setLoading(true)
     try {
-      const res = await api.post('/auth/verify-otp', { registerId, code: otpCode, purpose: 'register' })
-      const { token, user } = res.data
-      // store token & user locally using same keys as AuthContext
-      const tabId = getTabId()
-      localStorage.setItem(tokenKey(tabId), token)
-      localStorage.setItem(userKey(tabId), JSON.stringify(user))
+      await verifyOtp(registerId, otpCode)
       toast.success('Registration verified — you are logged in')
-      window.location.href = '/'
+      navigate('/')
     } catch (err) {
       toast.error(err.response?.data?.message || 'OTP verification failed')
     } finally { setLoading(false) }
@@ -114,7 +109,7 @@ export default function RegisterPage() {
                 </div>
               </div>
               <div className="form-group">
-                <label className="form-label">I am a</label>
+                <label className="form-label">I am a <span style={{ fontWeight: 400, color: 'var(--gray-400)' }}>(faculty needs admin approval)</span></label>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {['student', 'faculty'].map(r => (
                     <button key={r} type="button" onClick={() => set('role', r)}
@@ -124,7 +119,7 @@ export default function RegisterPage() {
                         color: form.role === r ? '#fff' : 'var(--gray-500)', fontSize: 14, fontWeight: 500,
                         cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize'
                       }}>
-                      {r}
+                      {r === 'faculty' ? 'Faculty (needs approval)' : 'Student'}
                     </button>
                   ))}
                 </div>

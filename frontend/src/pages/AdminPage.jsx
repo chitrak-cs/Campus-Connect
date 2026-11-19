@@ -94,7 +94,7 @@ export default function AdminPage() {
     try { await api.delete(`/files/${id}`); toast.success('File rejected'); loadPending(); loadStats() } catch { toast.error('Failed') }
   }
   const toggleUser = async (id, current) => {
-    try { await api.put(`/admin/users/${id}`, { is_active: current ? 0 : 1 }); toast.success('User updated'); loadUsers() } catch { toast.error('Failed') }
+    try { await api.put(`/admin/users/${id}`, { is_active: !current }); toast.success('User updated'); loadUsers() } catch { toast.error('Failed') }
   }
   const changeRole = async (id, role) => {
     try { await api.put(`/admin/users/${id}`, { role }); toast.success('Role updated'); loadUsers() } catch { toast.error('Failed') }
