@@ -95,18 +95,23 @@ process.on('unhandledRejection', (reason) => {
 });
 
 // ─── Start Server ────────────────────────────────────────────
-const PORT = process.env.PORT || 5001;
+// Only auto-start when run directly (`node server.js`); tests import { app, server } and manage this themselves.
+if (require.main === module) {
+  const PORT = process.env.PORT || 5001;
 
-initDB()
-  .then(() => {
-    cleanupOtps();
-    setInterval(cleanupOtps, 60 * 60 * 1000).unref();
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-      console.log(`🔌 Socket.IO ready`);
+  initDB()
+    .then(() => {
+      cleanupOtps();
+      setInterval(cleanupOtps, 60 * 60 * 1000).unref();
+      server.listen(PORT, () => {
+        console.log(`🚀 Server running on http://localhost:${PORT}`);
+        console.log(`🔌 Socket.IO ready`);
+      });
+    })
+    .catch((err) => {
+      console.error('❌ Failed to initialize database:', err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error('❌ Failed to initialize database:', err);
-    process.exit(1);
-  });
+}
+
+module.exports = { app, server, io };

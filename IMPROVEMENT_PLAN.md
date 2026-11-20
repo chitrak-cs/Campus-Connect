@@ -394,7 +394,7 @@ Core features (F1–F12) are in scope. Stretch features (F13–F15) are only for
 
 ## Phase 8: Testing
 
-- [ ] **8.1 Backend smoke tests** with `node:test` + `supertest` + `socket.io-client`, run against the **dev** Neon branch (`npm test`, needs `TEST_DATABASE_URI`). Export `app`/`server` from `server.js` without auto-listening when `require.main !== module`. Cover:
+- [x] **8.1 Backend smoke tests** with `node:test` + `supertest` + `socket.io-client`, run against the **dev** Neon branch (`npm test`, needs `TEST_DATABASE_URI`). Export `app`/`server` from `server.js` without auto-listening when `require.main !== module`. Cover:
   - register with `role:"faculty"` → stored as student with `requested_role`
   - login with the wrong password → 401 JSON, no "disabled" leak
   - OTP: the 6th attempt is rejected; reusing a used OTP is rejected
@@ -402,7 +402,7 @@ Core features (F1–F12) are in scope. Stretch features (F13–F15) are only for
   - private group: a non-member's join → 403; members list → 403; a socket that isn't a member never receives a group message
   - upload of a `.exe` renamed `.pdf` with mime `application/x-msdownload` → 400
   - admin can't demote themselves
-- [ ] **8.2** `npm run build` for the frontend passes with no warnings about missing env.
+- [x] **8.2** `npm run build` for the frontend passes with no warnings about missing env.
 - [ ] **8.3** Run the **manual QA checklist** (§11) on the Vercel preview, pointed at the dev backend if possible, or on local.
 
 ---
@@ -522,6 +522,8 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | Phase 6 verify | F10: toggle flips `data-theme`, persists in `cc_theme`, updates the theme-color meta. F11: `/api/search` (literal `%` matches nothing, empty q 400, no token 401) + Ctrl/Cmd+K palette: shortcut, focus, default page list, file/group results, arrow keys, Enter opens Files pre-filled, no-results text, Esc. F12: with the backend stopped the banner appears after 3 s (not before) and clears itself when the server returns. Sweep of all 46 routes without a token: every one returns 401 except the intentionally public ones (register, login, verify-otp, resend-otp, forgot/reset-password, public stats). All 13 admin-only routes return 403 for a student; editing/deleting someone else's file is 403; managing or rotating a foreign group's invite code is 403. F13-F15 are stretch and not started. |
 | 2026-11-20 | BUG FIXED: cold start logged users out | `AuthContext` cleared the session on ANY failed `/auth/me`, so a sleeping/booting server (502/network error) signed users out. It now ends the session only on 401/403 and otherwise keeps the cached user. Also proxied `/health` in `vite.config.js` (previously Vite answered it, so the F12 banner could never fire in dev). |
 | 2026-11-20 | Phase 7 | 7.1: all pages except Landing/Login are `React.lazy`; the shell stays visible (spinner) while a page chunk loads. Added vendor chunks (`vendor-react` 167 kB, `vendor-net` 101 kB, `vendor-date` 23 kB); the app entry is **60 kB** (limit 250). 7.2: socket layer moved to `backend/socket/index.js` (`server.js` 270 -> 113 lines); public routes were already in `routes/public.js`. Re-ran the socket suites after the move: group rooms, removal over live sockets, history/delete/broadcast, and the S2 intrusion test all pass (only the old S6 429 check differs, by design). 7.3: ESLint 9 flat configs for both packages (`npm run lint`), both clean (frontend keeps only `rules-of-hooks` + `exhaustive-deps`; the plugin's newer compiler-style rules flag the standard fetch-in-effect pattern). Lint caught a real bug: the filename sanitizer was not stripping backslashes. 7.4/7.5 are Render dashboard changes and are done in Phase 9 (7.4 needs the lockfile deploy; 7.5 is the Singapore service). |
+| 2026-11-20 | 8.1 | `npm test` in `backend/` (`node --test`, supertest, socket.io-client; needs `TEST_DATABASE_URI`, which `.env.example` documents and which must be the dev branch): **18 tests, all passing in ~19 s**. Covers every case listed in 8.1 plus: case-insensitive duplicate email, reset code rejected by verify-otp, identical forgot-password answers, group history 403 for outsiders, immediate-send-after-connect regression, member removal stops live delivery, students 403 on admin routes, role-request approval, password change signs out other sessions, search wildcard escaping. `server.js` exports `{ app, server, io }` and only auto-starts when run directly. Mail is captured by stubbing `utils/mailer`; users/groups created by tests are deleted afterwards. Rate limiting is off in tests. |
+| 2026-11-20 | 8.2 | `npm run build` and `npm run lint` pass with no warnings in the frontend. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
