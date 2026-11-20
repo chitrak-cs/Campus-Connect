@@ -20,6 +20,7 @@ const groupRoutes = require('./routes/groups');
 const adminRoutes = require('./routes/admin');
 const messageRoutes = require('./routes/messages');
 const publicRoutes = require('./routes/public');
+const searchRoutes = require('./routes/search');
 
 const app = express();
 const server = http.createServer(app);
@@ -233,6 +234,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/search', searchRoutes);
 
 app.get('/api/announcements', protect, async (req, res) => {
   try {

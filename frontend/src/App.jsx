@@ -13,6 +13,7 @@ import GroupsPage from './pages/GroupsPage'
 import AdminPage from './pages/AdminPage'
 import ProfilePage from './pages/ProfilePage'
 import NotFoundPage from './pages/NotFoundPage'
+import ServerWakeBanner from './components/ServerWakeBanner'
 
 const Splash = () => (
   <div className="splash">
@@ -47,6 +48,8 @@ const GuestRoute = ({ children }) => {
 
 export default function App() {
   return (
+    <>
+    <ServerWakeBanner />
     <Routes>
       <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
@@ -61,5 +64,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   )
 }

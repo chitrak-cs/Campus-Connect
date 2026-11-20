@@ -1,0 +1,14 @@
+.palette-overlay { position: fixed; inset: 0; z-index: var(--z-modal); background: var(--overlay); display: flex; justify-content: center; align-items: flex-start; padding: 12vh var(--space-4) var(--space-4); animation: ui-fade var(--dur-fast) var(--ease); }
+.palette { width: 100%; max-width: 580px; max-height: 70vh; display: flex; flex-direction: column; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--shadow-lg); overflow: hidden; animation: ui-rise var(--dur) var(--ease); }
+.palette__input { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border); color: var(--text-muted); }
+.palette__input input { flex: 1; border: 0; background: transparent; outline: none; font-size: var(--fs-16); color: var(--text); min-width: 0; }
+.palette__input kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); color: var(--text-faint); }
+.palette__list { list-style: none; overflow-y: auto; padding: var(--space-2); }
+.palette__section { padding: var(--space-3) var(--space-3) var(--space-1); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; color: var(--text-faint); }
+.palette__item { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: 10px var(--space-3); border: 0; background: transparent; border-radius: var(--r-md); text-align: left; color: var(--text); }
+.palette__item.is-active { background: var(--accent-soft); }
+.palette__text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.palette__text strong { font-size: var(--fs-14); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette__text small { font-size: var(--fs-12); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette__empty { padding: var(--space-8) var(--space-4); text-align: center; color: var(--text-muted); font-size: var(--fs-14); }
+@media (max-width: 600px) { .palette-overlay { padding-top: var(--space-6); } }

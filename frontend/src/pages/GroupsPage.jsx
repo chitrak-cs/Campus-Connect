@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Plus, Users, Lock, Globe, Search, MessageSquare, KeyRound, Trash2, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../utils/api'
@@ -47,9 +47,10 @@ function GroupCard({ g, userId, isSiteAdmin, onOpen, onMembers, onJoin, onLeave,
 export default function GroupsPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(location.state?.search || '')
   const [code, setCode] = useState('')
   const [joining, setJoining] = useState(false)
   const [showCreate, setShowCreate] = useState(false)

@@ -8,7 +8,8 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import useNotifications from '../hooks/useNotifications'
-import { Avatar, DropdownMenu, RoleBadge } from './ui'
+import { Avatar, DropdownMenu } from './ui'
+import CommandPalette from './CommandPalette'
 import '../styles/layout.css'
 
 const TITLES = { '/': 'Dashboard', '/files': 'Files', '/chat': 'Chat', '/groups': 'Groups', '/profile': 'Profile', '/admin': 'Admin' }
@@ -36,12 +37,20 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [drawer, setDrawer] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const { items, unread, chatUnread, markAllRead } = useNotifications(user?.id, location.pathname)
 
   const title = TITLES[location.pathname] || 'Campus Connect'
   const groups = user?.role === 'admin'
     ? [...NAV, { group: 'Admin', items: [{ label: 'Admin panel', icon: ShieldCheck, path: '/admin' }] }]
     : NAV
+
+  // Ctrl/Cmd+K opens quick search from anywhere
+  useEffect(() => {
+    const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearchOpen((o) => !o) } }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
 
   // Route change: close drawer, scroll to top, set the document title
   useEffect(() => {
@@ -117,7 +126,7 @@ export default function Layout() {
           </button>
           <h2 className="topbar__title">{title}</h2>
 
-          <button type="button" className="topbar__search" onClick={() => navigate('/files')} aria-label="Search files">
+          <button type="button" className="topbar__search" onClick={() => setSearchOpen(true)} aria-label="Search files and groups" aria-keyshortcuts="Control+K Meta+K">
             <Search size={15} aria-hidden="true" />
             <span>Search files and groups</span>
             <kbd>Ctrl K</kbd>
@@ -169,6 +178,8 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
+      <CommandPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       <nav className="tabbar" aria-label="Quick navigation">
         {TABS.map((t) => (

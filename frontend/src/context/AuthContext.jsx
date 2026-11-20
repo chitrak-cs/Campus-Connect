@@ -19,7 +19,13 @@ export const AuthProvider = ({ children }) => {
           saveUser(res.data.user);
           connectSocket(token);
         })
-        .catch(() => { clearAuth(); setUser(null); })
+        .catch((err) => {
+          // Only a rejected credential ends the session. If the server is asleep or briefly down
+          // (network error / 5xx), keep the cached user so a cold start doesn't sign people out.
+          const status = err.response?.status;
+          if (status === 401 || status === 403) { clearAuth(); setUser(null); }
+          else if (token) connectSocket(token);
+        })
         .finally(() => setLoading(false));
     } else {
       setLoading(false);

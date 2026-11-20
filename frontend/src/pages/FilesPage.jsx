@@ -22,8 +22,8 @@ export default function FilesPage() {
 
   const [tab, setTab] = useState('all')
   const [view, setView] = useState(readView)
-  const [search, setSearch] = useState('')
-  const [debounced, setDebounced] = useState('')
+  const [search, setSearch] = useState(location.state?.search || '')
+  const [debounced, setDebounced] = useState(location.state?.search || '')
   const [type, setType] = useState('')
   const [dept, setDept] = useState('')
   const [year, setYear] = useState('')
@@ -42,7 +42,7 @@ export default function FilesPage() {
   const [deleting, setDeleting] = useState(null)
 
   // Opened from the dashboard's "Upload material": consume the navigation state
-  useEffect(() => { if (location.state?.upload) navigate('/files', { replace: true, state: null }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (location.state?.upload || location.state?.search) navigate('/files', { replace: true, state: null }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { try { localStorage.setItem('cc_files_view', view) } catch { /* ignore */ } }, [view])
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 400); return () => clearTimeout(t) }, [search])
 
