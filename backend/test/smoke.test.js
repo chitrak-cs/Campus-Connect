@@ -156,7 +156,8 @@ describe('private groups', () => {
     si.emit('send_group_message', { group_id: gid, content: 'intruder' });
     // Send immediately after connecting: handlers must already be registered (regression test)
     so.emit('send_group_message', { group_id: gid, content: 'hello members' });
-    await h.sleep(1500);
+    await h.waitFor(() => ownerGot >= 1);
+    await h.sleep(1500);                                   // then give any (forbidden) leak time to show up
     so.close(); si.close();
 
     assert.equal(ownerGot, 1, 'only the legitimate message was delivered');
@@ -178,12 +179,15 @@ describe('private groups', () => {
     let got = 0;
     sm.on('new_group_message', () => got++);
     so.emit('send_group_message', { group_id: gid, content: 'one' });
-    await h.sleep(800);
+    assert.ok(await h.waitFor(() => got >= 1), 'member receives while in the group');
     assert.equal(got, 1);
 
     await h.api().delete(`/api/groups/${gid}/members/${member.id}`).set(h.auth(owner)).expect(200);
+    let ownerSaw = 0;
+    so.on('new_group_message', () => ownerSaw++);
     so.emit('send_group_message', { group_id: gid, content: 'two' });
-    await h.sleep(800);
+    await h.waitFor(() => ownerSaw >= 1);                  // the message was delivered to the owner...
+    await h.sleep(1000);                                    // ...so a removed member would have received it by now
     so.close(); sm.close();
     assert.equal(got, 1, 'no delivery after removal');
   });
@@ -254,7 +258,7 @@ describe('chat ordering', () => {
     const received = [];
     s.on('new_group_message', (m) => received.push(m.content));
     for (let i = 1; i <= 6; i++) s.emit('send_group_message', { group_id: gid, content: `msg ${i}` });
-    await h.sleep(2500);
+    await h.waitFor(() => received.length >= 6, { timeout: 20000 });
     s.close();
 
     const expected = [1, 2, 3, 4, 5, 6].map((i) => `msg ${i}`);

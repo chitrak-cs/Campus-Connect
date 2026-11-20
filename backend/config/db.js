@@ -1,8 +1,16 @@
-const { Pool } = require('pg');
 require('dotenv').config();
+require('./network');
 const crypto = require('crypto');
+
+// Optional local-only fallback: when a network filters the Postgres port (5432), NEON_WS=true talks to Neon
+// over WebSocket on port 443 using Neon's serverless driver (same Pool API). Production uses plain `pg`.
+const useWebSocket = process.env.NEON_WS === 'true';
+const driver = useWebSocket ? require('@neondatabase/serverless') : require('pg');
+if (useWebSocket) driver.neonConfig.webSocketConstructor = require('ws');
+const { Pool } = driver;
+
 // Columns are TIMESTAMP (no tz) holding UTC; without this, pg parses them as the server's local time.
-require('pg').types.setTypeParser(1114, (v) => new Date(v.replace(' ', 'T') + 'Z'));
+driver.types.setTypeParser(1114, (v) => new Date(v.replace(' ', 'T') + 'Z'));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URI,

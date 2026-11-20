@@ -71,5 +71,14 @@ function connectSocket(user) {
 const trackGroup = (id) => createdGroupIds.push(id);
 const trackUser = (id) => createdUserIds.push(id);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Poll until predicate() is truthy (for positive assertions; slower databases just take longer)
+async function waitFor(predicate, { timeout = 10000, interval = 100 } = {}) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    if (await predicate()) return true;
+    await sleep(interval);
+  }
+  return false;
+}
 
-module.exports = { setup, teardown, makeUser, auth, api, pool, sentMail, lastOtpFor, connectSocket, trackGroup, trackUser, sleep, RUN };
+module.exports = { setup, teardown, makeUser, auth, api, pool, sentMail, lastOtpFor, connectSocket, trackGroup, trackUser, sleep, waitFor, RUN };
