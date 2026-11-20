@@ -99,15 +99,25 @@ function initSocket(httpServer, allowedOrigins) {
       return true;
     };
 
-    socket.on('send_global_message', async (data) => {
-      try {
+    // Sends from one socket run strictly one after another, so they are stored AND broadcast in the
+    // order they were sent (handlers are async; without this they could finish out of order).
+    let sendQueue = Promise.resolve();
+    const enqueue = (fn) => {
+      sendQueue = sendQueue.then(fn).catch((err) => console.error('Message error:', err.message));
+    };
+
+    socket.on('send_global_message', (data) => {
+      // Stamp on arrival (synchronously): stored order then always matches send order.
+      const sentAt = new Date();
+      enqueue(async () => {
         const parsed = chatContent.safeParse(data?.content);
         if (!parsed.success || throttled()) return;
 
         const id = uuidv4();
         await pool.query(
-          `INSERT INTO messages (id, content, sender_id, is_global) VALUES ($1, $2, $3, TRUE)`,
-          [id, parsed.data, user.id]
+          `INSERT INTO messages (id, content, sender_id, is_global, created_at)
+           VALUES ($1, $2, $3, TRUE, to_timestamp($4::double precision / 1000.0) AT TIME ZONE 'UTC')`,
+          [id, parsed.data, user.id, sentAt.getTime()]
         );
 
         io.to('global').emit('new_global_message', {
@@ -118,15 +128,14 @@ function initSocket(httpServer, allowedOrigins) {
           sender_avatar: user.avatar_url,
           sender_role: user.role,
           is_global: true,
-          created_at: new Date().toISOString(),
+          created_at: sentAt.toISOString(),
         });
-      } catch (err) {
-        console.error('Message error:', err.message);
-      }
+      });
     });
 
-    socket.on('send_group_message', async (data) => {
-      try {
+    socket.on('send_group_message', (data) => {
+      const sentAt = new Date(); // see send_global_message
+      enqueue(async () => {
         const parsed = chatContent.safeParse(data?.content);
         const gid = uuidSchema.safeParse(data?.group_id);
         if (!parsed.success || !gid.success || throttled()) return;
@@ -146,8 +155,9 @@ function initSocket(httpServer, allowedOrigins) {
 
         const id = uuidv4();
         await pool.query(
-          `INSERT INTO messages (id, content, sender_id, group_id, is_global) VALUES ($1, $2, $3, $4, FALSE)`,
-          [id, parsed.data, user.id, group_id]
+          `INSERT INTO messages (id, content, sender_id, group_id, is_global, created_at)
+           VALUES ($1, $2, $3, $4, FALSE, to_timestamp($5::double precision / 1000.0) AT TIME ZONE 'UTC')`,
+          [id, parsed.data, user.id, group_id, sentAt.getTime()]
         );
 
         io.to(`group:${group_id}`).emit('new_group_message', {
@@ -160,11 +170,9 @@ function initSocket(httpServer, allowedOrigins) {
           group_id,
           group_name: g[0].name,
           is_global: false,
-          created_at: new Date().toISOString(),
+          created_at: sentAt.toISOString(),
         });
-      } catch (err) {
-        console.error('Group message error:', err.message);
-      }
+      });
     });
 
     socket.on('typing_global', () => {

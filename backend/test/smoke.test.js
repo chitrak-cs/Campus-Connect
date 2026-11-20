@@ -242,3 +242,24 @@ describe('search', () => {
     assert.equal((await h.api().get('/api/search').query({ q: '' }).set(h.auth(u))).status, 400);
   });
 });
+
+describe('chat ordering', () => {
+  test('messages sent back-to-back are stored and returned in send order', async () => {
+    const owner = await h.makeUser();
+    const created = await h.api().post('/api/groups').set(h.auth(owner)).send({ name: 'Order club' });
+    const gid = created.body.group.id;
+    h.trackGroup(gid);
+
+    const s = await h.connectSocket(owner);
+    const received = [];
+    s.on('new_group_message', (m) => received.push(m.content));
+    for (let i = 1; i <= 6; i++) s.emit('send_group_message', { group_id: gid, content: `msg ${i}` });
+    await h.sleep(2500);
+    s.close();
+
+    const expected = [1, 2, 3, 4, 5, 6].map((i) => `msg ${i}`);
+    assert.deepEqual(received, expected, 'broadcast order');
+    const hist = await h.api().get(`/api/messages/group/${gid}`).set(h.auth(owner));
+    assert.deepEqual(hist.body.messages.map((m) => m.content), expected, 'history order');
+  });
+});
