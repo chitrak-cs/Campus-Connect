@@ -1,0 +1,37 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: 16px; -webkit-font-smoothing: antialiased; text-size-adjust: 100%; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+  min-height: 100vh;
+}
+
+/* Playfair only for page titles and the landing hero (opt in with .font-display) */
+h1, h2, h3, h4, h5 { font-family: var(--font-body); line-height: 1.25; color: var(--text); font-weight: 600; }
+.font-display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.01em; }
+code, pre { font-family: var(--font-mono); }
+
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: inherit; }
+input, textarea, select { font-family: inherit; }
+img { max-width: 100%; display: block; }
+
+/* Visible keyboard focus everywhere */
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--r-sm); }
+:focus:not(:focus-visible) { outline: none; }
+
+::selection { background: var(--accent-soft); color: var(--text); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.skip-link {
+  position: absolute; left: var(--space-4); top: -48px; z-index: var(--z-toast);
+  background: var(--primary); color: var(--on-primary); padding: var(--space-2) var(--space-4);
+  border-radius: var(--r-md); transition: top var(--dur-fast) var(--ease);
+}
+.skip-link:focus { top: var(--space-4); }

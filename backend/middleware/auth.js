@@ -20,7 +20,7 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const { rows } = await pool.query(
-      `SELECT id, name, email, role, department, year, avatar_url, is_active
+      `SELECT id, name, email, role, department, year, avatar_url, is_active, token_version
        FROM users
        WHERE id = $1`,
       [decoded.id]
@@ -32,7 +32,13 @@ const protect = async (req, res, next) => {
       });
     }
 
+    // Tokens issued before a password change/deactivation are rejected
+    if ((decoded.tv ?? 0) !== rows[0].token_version) {
+      return res.status(401).json({ message: 'Session expired, please sign in again' });
+    }
+
     req.user = rows[0];
+    delete req.user.token_version;
 
     next();
   } catch (err) {

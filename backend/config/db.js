@@ -1,12 +1,27 @@
-const { Pool } = require('pg');
 require('dotenv').config();
+require('./network');
+const crypto = require('crypto');
+
+// Optional local-only fallback: when a network filters the Postgres port (5432), NEON_WS=true talks to Neon
+// over WebSocket on port 443 using Neon's serverless driver (same Pool API). Production uses plain `pg`.
+const useWebSocket = process.env.NEON_WS === 'true';
+const driver = useWebSocket ? require('@neondatabase/serverless') : require('pg');
+if (useWebSocket) driver.neonConfig.webSocketConstructor = require('ws');
+const { Pool } = driver;
+
+// Columns are TIMESTAMP (no tz) holding UTC; without this, pg parses them as the server's local time.
+driver.types.setTypeParser(1114, (v) => new Date(v.replace(' ', 'T') + 'Z'));
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URI,
-  ssl: {
-    rejectUnauthorized: false, // required for Neon
-  },
+  ssl: { rejectUnauthorized: true },
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
+
+// Neon drops idle connections; without this handler the process can crash.
+pool.on('error', (err) => console.error('PG pool error (client dropped):', err.message));
 
 
 const initDB = async () => {
@@ -115,9 +130,85 @@ const initDB = async () => {
       ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE;
     `);
 
+    // ── Phase 2 schema (idempotent) ──
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS requested_role TEXT CHECK (requested_role IN ('faculty')),
+        ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 0;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS otps (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL,
+        code VARCHAR(10),
+        purpose VARCHAR(32) NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        used BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await client.query(`ALTER TABLE otps ALTER COLUMN code DROP NOT NULL;`);
+    await client.query(`
+      ALTER TABLE otps
+        ADD COLUMN IF NOT EXISTS code_hash TEXT,
+        ADD COLUMN IF NOT EXISTS attempts INT NOT NULL DEFAULT 0;
+    `);
+
+    await client.query(`
+      ALTER TABLE study_groups
+        ADD COLUMN IF NOT EXISTS invite_code VARCHAR(12) UNIQUE;
+    `);
+    // Backfill invite codes for existing private groups
+    const { rows: noCode } = await client.query(
+      `SELECT id FROM study_groups WHERE is_private AND invite_code IS NULL`
+    );
+    for (const g of noCode) {
+      await client.query(`UPDATE study_groups SET invite_code=$1 WHERE id=$2`, [
+        crypto.randomBytes(6).toString('base64url').slice(0, 8),
+        g.id,
+      ]);
+    }
+
+    await client.query(`
+      ALTER TABLE files
+        ADD COLUMN IF NOT EXISTS resource_type TEXT,
+        ADD COLUMN IF NOT EXISTS original_name TEXT,
+        ADD COLUMN IF NOT EXISTS mime_type TEXT,
+        ADD COLUMN IF NOT EXISTS size_bytes BIGINT;
+    `);
+
+    // ── Phase 4: remaining columns, bookmarks, indexes (all idempotent) ──
+    await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;`);
+    await client.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP;`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        file_id UUID REFERENCES files(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        PRIMARY KEY (user_id, file_id)
+      );
+    `);
+
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_group_created  ON messages (group_id, created_at DESC);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_messages_global_created ON messages (created_at DESC) WHERE is_global;`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_files_approved_created  ON files (is_approved, created_at DESC);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_files_uploaded_by       ON files (uploaded_by);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_group_members_user      ON group_members (user_id);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_otps_user_purpose       ON otps (user_id, purpose);`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_bookmarks_user          ON bookmarks (user_id, created_at DESC);`);
+
+    // Case-insensitive unique email. Fails loudly (rather than silently) if duplicates exist.
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_key ON users (LOWER(email));`);
   } finally {
     client.release();
   }
 };
 
-module.exports = { pool, initDB };
+// Remove stale OTPs (run on boot and hourly)
+const cleanupOtps = () =>
+  pool
+    .query(`DELETE FROM otps WHERE created_at < NOW() - INTERVAL '1 day'`)
+    .catch((e) => console.error('OTP cleanup failed:', e.message));
+
+module.exports = { pool, initDB, cleanupOtps };

@@ -1,44 +1,74 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
+import { Spinner } from './components/ui'
+import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import Dashboard from './pages/Dashboard'
-import FilesPage from './pages/FilesPage'
-import ChatPage from './pages/ChatPage'
-import GroupsPage from './pages/GroupsPage'
-import AdminPage from './pages/AdminPage'
-import ProfilePage from './pages/ProfilePage'
+import ServerWakeBanner from './components/ServerWakeBanner'
 
-const ProtectedRoute = ({ children, adminOnly }) => {
-  const { user, loading } = useAuth()
-  if (loading) return (
-    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0B1F3A' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div className="spinner gold" style={{ width: 36, height: 36, margin: '0 auto 16px' }} />
-        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Loading Campus Connect...</div>
-      </div>
+// Heavy pages are fetched on demand (Landing and Login stay in the main bundle for a fast first paint)
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const FilesPage = lazy(() => import('./pages/FilesPage'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
+const GroupsPage = lazy(() => import('./pages/GroupsPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+
+const Splash = () => (
+  <div className="splash">
+    <div className="splash__inner">
+      <Spinner size="lg" label="Loading Campus Connect" />
+      <p>Loading Campus Connect…</p>
     </div>
-  )
-  if (!user) return <Navigate to="/login" replace />
-  if (adminOnly && user.role !== 'admin') return <Navigate to="/" replace />
-  return children
+  </div>
+)
+
+// Logged in: the app shell. Logged out: landing page at "/", otherwise sign in.
+const Gate = () => {
+  const { user, loading, sessionExpired } = useAuth()
+  const { pathname } = useLocation()
+  if (loading) return <Splash />
+  if (user) return <Layout />
+  if (pathname === '/') return <LandingPage />
+  return <Navigate to={sessionExpired ? '/login?expired=1' : '/login'} replace />
+}
+
+const AdminRoute = ({ children }) => {
+  const { user } = useAuth()
+  return user?.role === 'admin' ? children : <Navigate to="/" replace />
+}
+
+// Signed-in users have no reason to see the auth pages
+const GuestRoute = ({ children }) => {
+  const { user, loading } = useAuth()
+  if (loading) return <Splash />
+  return user ? <Navigate to="/" replace /> : children
 }
 
 export default function App() {
   return (
+    <>
+    <ServerWakeBanner />
+    <Suspense fallback={<Splash />}>
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
+      <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
+      <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
+      <Route path="/" element={<Gate />}>
         <Route index element={<Dashboard />} />
         <Route path="files" element={<FilesPage />} />
         <Route path="chat" element={<ChatPage />} />
         <Route path="groups" element={<GroupsPage />} />
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="admin" element={<ProtectedRoute adminOnly><AdminPage /></ProtectedRoute>} />
+        <Route path="admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
       </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
+    </>
   )
 }

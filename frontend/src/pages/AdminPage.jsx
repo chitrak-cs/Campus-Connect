@@ -1,385 +1,304 @@
-import { useState, useEffect } from 'react'
-import api from '../utils/api'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  Users, FileText, Download, MessageSquare, Layers, Clock, UserCheck, Check, X, Eye, MoreVertical,
+  Plus, Search, Trash2, ShieldCheck, GraduationCap, UserMinus, UserPlus, Megaphone, BadgeCheck,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
-import { Users, FileText, CheckCircle, XCircle, Trash2, UserPlus, Download, Bell, BarChart2, X, Shield, Eye } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import api from '../utils/api'
+import { useAuth } from '../context/AuthContext'
+import { fileSize } from '../utils/format'
+import StatCard from '../components/StatCard'
+import FileTypeIcon from '../components/FileTypeIcon'
+import PreviewModal from '../components/files/PreviewModal'
+import {
+  PageHeader, Tabs, Card, Button, Badge, RoleBadge, PriorityBadge, Avatar, EmptyState, SkeletonList,
+  ConfirmDialog, DropdownMenu, Modal, Input, Select, Textarea,
+} from '../components/ui'
+import '../styles/pages/admin.css'
 
-const TABS = [
-  { id: 'stats', label: 'Overview', icon: BarChart2 },
-  { id: 'files', label: 'File Approvals', icon: FileText },
-  { id: 'users', label: 'User Management', icon: Users },
-  { id: 'announce', label: 'Announcements', icon: Bell },
-]
+const ROLES = ['student', 'faculty', 'admin']
+const PAGE_SIZE = 20
 
-function StatBox({ label, value, color, onClick }) {
+/* ───────── Create user ───────── */
+function CreateUserModal({ onClose, onCreated }) {
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student', department: '', year: '' })
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const set = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setError('') }
+  const submit = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try { await api.post('/admin/users', form); toast.success('User created'); onCreated(); onClose() }
+    catch (err) { setError(err.response?.data?.message || 'Could not create user') } finally { setSaving(false) }
+  }
   return (
-    <div className="card stat-box" onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      <div className="stat-box-value" style={{ color: color || 'var(--navy)' }}>{value ?? '—'}</div>
-      <div className="stat-box-label">{label}</div>
-    </div>
+    <Modal onClose={onClose} title="Create user"
+      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button type="submit" form="create-user" loading={saving}>Create user</Button></>}>
+      <form id="create-user" className="upload-form" onSubmit={submit}>
+        <Input label="Full name" required value={form.name} onChange={(e) => set('name', e.target.value)} />
+        <Input label="Email" type="email" required value={form.email} onChange={(e) => set('email', e.target.value)} />
+        <Input label="Temporary password" type="password" required autoComplete="new-password" hint="At least 8 characters. Ask them to change it after signing in." value={form.password} error={error} onChange={(e) => set('password', e.target.value)} />
+        <Select label="Role" value={form.role} onChange={(e) => set('role', e.target.value)}>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</Select>
+      </form>
+    </Modal>
+  )
+}
+
+/* ───────── Overview ───────── */
+function Overview({ stats, loading, go }) {
+  return (
+    <>
+      <div className="stat-grid">
+        <StatCard icon={Users} label="Members" value={stats?.users} tone="info" loading={loading} />
+        <StatCard icon={FileText} label="Approved files" value={stats?.files} tone="success" loading={loading} />
+        <StatCard icon={Clock} label="Pending files" value={stats?.pending} tone="danger" loading={loading} />
+        <StatCard icon={Layers} label="Groups" value={stats?.groups} tone="accent" loading={loading} />
+        <StatCard icon={MessageSquare} label="Messages" value={stats?.messages} tone="info" loading={loading} />
+        <StatCard icon={Download} label="Downloads" value={stats?.downloads} tone="success" loading={loading} />
+      </div>
+      {(stats?.pending > 0 || stats?.pendingRoleRequests > 0) && (
+        <div className="stack">
+          {stats.pending > 0 && <button type="button" className="alert alert--danger" onClick={() => go('files')}><Clock size={16} /> {stats.pending} file{stats.pending > 1 ? 's' : ''} waiting for review</button>}
+          {stats.pendingRoleRequests > 0 && <button type="button" className="alert alert--warning" onClick={() => go('roles')}><UserCheck size={16} /> {stats.pendingRoleRequests} faculty request{stats.pendingRoleRequests > 1 ? 's' : ''} waiting for review</button>}
+        </div>
+      )}
+    </>
   )
 }
 
 export default function AdminPage() {
-  const [tab, setTab] = useState('stats')
+  const { user: me } = useAuth()
+  const [tab, setTab] = useState('overview')
   const [stats, setStats] = useState(null)
-  const [pendingFiles, setPendingFiles] = useState([])
+  const [statsLoading, setStatsLoading] = useState(true)
+
+  const [pending, setPending] = useState([])
+  const [pendingLoading, setPendingLoading] = useState(false)
+  const [preview, setPreview] = useState(null)
+
   const [users, setUsers] = useState([])
-  const [announcements, setAnnouncements] = useState([])
-  const [statsLoading, setStatsLoading] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [userSearch, setUserSearch] = useState('')
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [search, setSearch] = useState('')
+  const [debounced, setDebounced] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [showCreate, setShowCreate] = useState(false)
+
+  const [requests, setRequests] = useState([])
+  const [requestsLoading, setRequestsLoading] = useState(false)
+
+  const [announcements, setAnnouncements] = useState([])
   const [annForm, setAnnForm] = useState({ title: '', content: '', priority: 'low' })
-  const [showCreateUser, setShowCreateUser] = useState(false)
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'student', department: '', year: '' })
+  const [posting, setPosting] = useState(false)
 
-  useEffect(() => { loadStats() }, [])
-  useEffect(() => { if (tab === 'files') loadPending() }, [tab])
-  useEffect(() => { if (tab === 'users') loadUsers() }, [tab, userSearch, roleFilter])
-  useEffect(() => { if (tab === 'announce') loadAnnouncements() }, [tab])
+  const [confirm, setConfirm] = useState(null) // { title, message, confirmLabel, danger, run }
 
-  const [statsError, setStatsError] = useState(null)
+  const loadStats = useCallback(async () => {
+    try { setStats((await api.get('/admin/stats')).data) } catch { toast.error('Could not load stats') } finally { setStatsLoading(false) }
+  }, [])
+  const loadPending = useCallback(async () => {
+    setPendingLoading(true)
+    try { setPending((await api.get('/files/pending')).data.files || []) } catch { toast.error('Could not load pending files') } finally { setPendingLoading(false) }
+  }, [])
+  const loadUsers = useCallback(async () => {
+    setUsersLoading(true)
+    try { setUsers((await api.get('/admin/users', { params: { search: debounced || undefined, role: roleFilter || undefined, page, limit: PAGE_SIZE } })).data.users || []) }
+    catch { toast.error('Could not load users') } finally { setUsersLoading(false) }
+  }, [debounced, roleFilter, page])
+  const loadRequests = useCallback(async () => {
+    setRequestsLoading(true)
+    try { setRequests((await api.get('/admin/role-requests')).data.requests || []) } catch { toast.error('Could not load requests') } finally { setRequestsLoading(false) }
+  }, [])
+  const loadAnnouncements = useCallback(async () => {
+    try { setAnnouncements((await api.get('/admin/announcements')).data.announcements || []) } catch { toast.error('Could not load announcements') }
+  }, [])
 
-  const sleep = (ms) => new Promise(res => setTimeout(res, ms))
+  useEffect(() => { document.title = 'Admin · Campus Connect'; loadStats() }, [loadStats])
+  useEffect(() => { const t = setTimeout(() => { setDebounced(search.trim()); setPage(1) }, 400); return () => clearTimeout(t) }, [search])
+  useEffect(() => { if (tab === 'files') loadPending() }, [tab, loadPending])
+  useEffect(() => { if (tab === 'users') loadUsers() }, [tab, loadUsers])
+  useEffect(() => { if (tab === 'roles') loadRequests() }, [tab, loadRequests])
+  useEffect(() => { if (tab === 'announce') loadAnnouncements() }, [tab, loadAnnouncements])
 
-  const loadStats = async (attempts = 3) => {
-    setStatsLoading(true)
-    setStatsError(null)
-    for (let i = 1; i <= attempts; i++) {
-      try {
-        const r = await api.get('/admin/stats')
-        setStats(r.data)
-        setStatsError(null)
-        setStatsLoading(false)
-        return
-      } catch (err) {
-        const msg = err.response?.data?.message || err.message || 'Failed to fetch'
-        console.warn(`loadStats attempt ${i} failed:`, msg)
-        if (i === attempts) {
-          setStats(null)
-          setStatsError(msg)
-          setStatsLoading(false)
-          return
-        }
-        // exponential backoff before retrying
-        await sleep(300 * i)
-      }
-    }
-  }
-  const loadPending = async () => {
-    setLoading(true)
-    try { const r = await api.get('/files/pending'); setPendingFiles(r.data.files || []) } catch (e) { console.error('Failed to load pending files', e) }
-    finally { setLoading(false) }
-  }
-  const loadUsers = async () => {
-    setLoading(true)
-    try {
-      const params = {}
-      if (userSearch) params.search = userSearch
-      if (roleFilter) params.role = roleFilter
-      const r = await api.get('/admin/users', { params })
-      setUsers(r.data.users || [])
-    } catch (e) { console.error('Failed to load users', e) }
-    finally { setLoading(false) }
-  }
-  const loadAnnouncements = async () => {
-    try { const r = await api.get('/admin/announcements'); setAnnouncements(r.data.announcements || []) } catch (e) { console.error('Failed to load announcements', e) }
+  // Run a mutation, toast the result, then refresh what changed
+  const act = async (fn, okMsg, refresh = []) => {
+    try { await fn(); toast.success(okMsg); refresh.forEach((r) => r()) }
+    catch (err) { toast.error(err.response?.data?.message || 'Action failed') }
   }
 
-  const approveFile = async (id) => {
-    try { await api.put(`/files/${id}/approve`); toast.success('File approved'); loadPending(); loadStats() } catch { toast.error('Failed') }
-  }
-  const rejectFile = async (id) => {
-    if (!confirm('Reject and delete this file?')) return
-    try { await api.delete(`/files/${id}`); toast.success('File rejected'); loadPending(); loadStats() } catch { toast.error('Failed') }
-  }
-  const toggleUser = async (id, current) => {
-    try { await api.put(`/admin/users/${id}`, { is_active: current ? 0 : 1 }); toast.success('User updated'); loadUsers() } catch { toast.error('Failed') }
-  }
-  const changeRole = async (id, role) => {
-    try { await api.put(`/admin/users/${id}`, { role }); toast.success('Role updated'); loadUsers() } catch { toast.error('Failed') }
-  }
-  const deleteUser = async (id) => {
-    if (!confirm('Delete this user? This cannot be undone.')) return
-    try { await api.delete(`/admin/users/${id}`); toast.success('User deleted'); loadUsers() } catch { toast.error('Failed') }
-  }
+  const askConfirm = (cfg) => setConfirm(cfg)
+  const runConfirm = async () => { const c = confirm; setConfirm(null); await c.run() }
+
+  const approve = (f) => act(() => api.put(`/files/${f.id}/approve`), 'File approved', [loadPending, loadStats])
+  const reject = (f) => askConfirm({ title: 'Reject this file?', danger: true, confirmLabel: 'Reject and delete',
+    message: `"${f.title}" will be deleted and the uploader won't be notified.`, run: () => act(() => api.delete(`/files/${f.id}`), 'File rejected', [loadPending, loadStats]) })
+  const download = async (f) => { try { window.open((await api.post(`/files/${f.id}/download`)).data.url, '_blank', 'noopener') } catch { toast.error('Download failed') } }
+
+  const setRole = (u, role) => act(() => api.put(`/admin/users/${u.id}`, { role }), `${u.name} is now ${role}`, [loadUsers, loadStats])
+  const setActive = (u, is_active) => act(() => api.put(`/admin/users/${u.id}`, { is_active }), is_active ? 'User reactivated' : 'User deactivated', [loadUsers])
+  const removeUser = (u) => askConfirm({ title: 'Delete this user?', danger: true, confirmLabel: 'Delete user',
+    message: `${u.name} and everything they uploaded will be permanently deleted. This can't be undone.`, run: () => act(() => api.delete(`/admin/users/${u.id}`), 'User deleted', [loadUsers, loadStats]) })
+  const deactivate = (u) => askConfirm({ title: 'Deactivate this user?', danger: true, confirmLabel: 'Deactivate',
+    message: `${u.name} will be signed out and unable to sign in until reactivated.`, run: () => setActive(u, false) })
+
+  const approveReq = (u) => act(() => api.post(`/admin/role-requests/${u.id}/approve`), `${u.name} is now faculty`, [loadRequests, loadStats])
+  const rejectReq = (u) => act(() => api.post(`/admin/role-requests/${u.id}/reject`), 'Request rejected', [loadRequests, loadStats])
+
   const postAnnouncement = async (e) => {
     e.preventDefault()
-    try { await api.post('/admin/announcements', annForm); toast.success('Announcement posted!'); setAnnForm({ title: '', content: '', priority: 'low' }); loadAnnouncements() } catch { toast.error('Failed') }
+    setPosting(true)
+    await act(() => api.post('/admin/announcements', annForm), 'Announcement posted', [loadAnnouncements])
+    setAnnForm({ title: '', content: '', priority: 'low' }); setPosting(false)
   }
-  const deleteAnn = async (id) => {
-    try { await api.delete(`/admin/announcements/${id}`); toast.success('Deleted'); loadAnnouncements() } catch (e) { console.error('Failed to delete announcement', e) }
+  const removeAnnouncement = (a) => askConfirm({ title: 'Delete announcement?', danger: true, confirmLabel: 'Delete',
+    message: `"${a.title}" will no longer be shown to anyone.`, run: () => act(() => api.delete(`/admin/announcements/${a.id}`), 'Announcement deleted', [loadAnnouncements]) })
+
+  const userMenu = (u) => {
+    const self = u.id === me?.id
+    return [
+      { label: 'Make student', icon: GraduationCap, hidden: u.role === 'student' || self, onClick: () => setRole(u, 'student') },
+      { label: 'Make faculty', icon: BadgeCheck, hidden: u.role === 'faculty' || self, onClick: () => setRole(u, 'faculty') },
+      { label: 'Make admin', icon: ShieldCheck, hidden: u.role === 'admin' || self, onClick: () => setRole(u, 'admin') },
+      { label: 'Reactivate', icon: UserPlus, hidden: u.is_active, onClick: () => setActive(u, true) },
+      { label: 'Deactivate', icon: UserMinus, hidden: !u.is_active || self, danger: true, onClick: () => deactivate(u) },
+      { label: 'Delete user', icon: Trash2, hidden: self, danger: true, onClick: () => removeUser(u) },
+    ]
   }
-  const createUser = async (e) => {
-    e.preventDefault()
-    try { await api.post('/admin/users', newUser); toast.success('User created!'); setShowCreateUser(false); setNewUser({ name: '', email: '', password: '', role: 'student', department: '', year: '' }); loadUsers() }
-    catch (err) { toast.error(err.response?.data?.message || 'Failed') }
-  }
+
+  const tabs = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'files', label: 'Pending files', count: stats?.pending },
+    { id: 'users', label: 'Users' },
+    { id: 'roles', label: 'Role requests', count: stats?.pendingRoleRequests },
+    { id: 'announce', label: 'Announcements' },
+  ]
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <div style={{ width: 40, height: 40, background: 'var(--navy)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Shield size={20} color="var(--gold)" />
-        </div>
-        <div>
-          <h1 className="page-title">Admin Panel</h1>
-          <p className="page-subtitle">Manage users, files, and announcements</p>
-        </div>
-      </div>
+      <PageHeader title="Admin" subtitle="Review uploads, manage people, and post announcements" />
+      <Tabs label="Admin sections" tabs={tabs} value={tab} onChange={setTab} />
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 24, background: '#fff', padding: 4, borderRadius: 'var(--radius)', border: '1px solid var(--gray-100)', width: 'fit-content' }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px',
-              borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 500,
-              background: tab === t.id ? 'var(--navy)' : 'transparent',
-              color: tab === t.id ? '#fff' : 'var(--gray-500)',
-              transition: 'all 0.15s'
-            }}>
-            <t.icon size={15} /> {t.label}
-            {t.id === 'files' && pendingFiles.length > 0 && (
-              <span style={{ background: 'var(--red)', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 11, fontWeight: 700 }}>{pendingFiles.length}</span>
-            )}
-          </button>
+      <div className="admin__panel" id={`panel-${tab}`} role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        {tab === 'overview' && <Overview stats={stats} loading={statsLoading} go={setTab} />}
+
+        {tab === 'files' && (pendingLoading ? <SkeletonList rows={3} /> : pending.length === 0 ? (
+          <Card><EmptyState icon={Check} title="All caught up" text="There are no files waiting for review." /></Card>
+        ) : (
+          <div className="stack">
+            {pending.map((f) => (
+              <div key={f.id} className="row-card row-card--wrap">
+                <FileTypeIcon file={f} />
+                <div className="row-card__main">
+                  <div className="row-card__title">{f.title}</div>
+                  <div className="row-card__meta">{[f.subject, f.department, f.year].filter(Boolean).join(' · ')}<span className="dot-sep" />{f.uploader_name} ({f.uploader_email})<span className="dot-sep" />{fileSize(f)}<span className="dot-sep" />{formatDistanceToNow(new Date(f.created_at), { addSuffix: true })}</div>
+                </div>
+                <div className="admin__actions">
+                  <Button size="sm" variant="secondary" leftIcon={<Eye size={14} />} onClick={() => setPreview(f)}>Preview</Button>
+                  <Button size="sm" leftIcon={<Check size={14} />} onClick={() => approve(f)}>Approve</Button>
+                  <Button size="sm" variant="ghost" className="gcard__danger" leftIcon={<X size={14} />} onClick={() => reject(f)}>Reject</Button>
+                </div>
+              </div>
+            ))}
+          </div>
         ))}
+
+        {tab === 'users' && (
+          <>
+            <div className="admin__toolbar">
+              <label className="ftools__search"><Search size={16} aria-hidden="true" /><span className="sr-only">Search users</span>
+                <input type="search" placeholder="Search by name or email" value={search} onChange={(e) => setSearch(e.target.value)} /></label>
+              <Select aria-label="Filter by role" value={roleFilter} onChange={(e) => { setRoleFilter(e.target.value); setPage(1) }}>
+                <option value="">All roles</option>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </Select>
+              <Button leftIcon={<Plus size={16} />} onClick={() => setShowCreate(true)}>Create user</Button>
+            </div>
+            {usersLoading ? <SkeletonList rows={5} height={52} /> : users.length === 0 ? (
+              <Card><EmptyState icon={Users} title="No users found" text="Try a different search or role filter." /></Card>
+            ) : (
+              <>
+                <div className="dtable-wrap">
+                  <table className="dtable">
+                    <thead><tr><th>User</th><th>Role</th><th>Status</th><th className="dtable__hide">Joined</th><th><span className="sr-only">Actions</span></th></tr></thead>
+                    <tbody>
+                      {users.map((u) => (
+                        <tr key={u.id}>
+                          <td><div className="dtable__user"><Avatar name={u.name} size="sm" /><div><div className="dtable__name">{u.name}{u.id === me?.id && <span className="muted"> (you)</span>}</div><div className="dtable__email">{u.email}</div></div></div></td>
+                          <td><RoleBadge role={u.role} />{u.requested_role && <Badge tone="warning" className="dtable__req">wants {u.requested_role}</Badge>}</td>
+                          <td>{u.is_active ? <Badge tone="success">Active</Badge> : <Badge tone="danger">Deactivated</Badge>}</td>
+                          <td className="dtable__hide muted">{new Date(u.created_at).toLocaleDateString()}</td>
+                          <td className="dtable__end">
+                            {u.id !== me?.id || !u.is_active ? (
+                              <DropdownMenu label={`Actions for ${u.name}`} trigger={({ props }) => <button type="button" className="fbtn fbtn--icon" {...props}><MoreVertical size={16} /></button>} items={userMenu(u)} />
+                            ) : null}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="admin__pager">
+                  <Button size="sm" variant="secondary" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>Previous</Button>
+                  <span className="muted">Page {page}</span>
+                  <Button size="sm" variant="secondary" disabled={users.length < PAGE_SIZE} onClick={() => setPage((p) => p + 1)}>Next</Button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {tab === 'roles' && (requestsLoading ? <SkeletonList rows={2} /> : requests.length === 0 ? (
+          <Card><EmptyState icon={UserCheck} title="No pending requests" text="Faculty role requests will appear here for you to approve." /></Card>
+        ) : (
+          <div className="stack">
+            {requests.map((u) => (
+              <div key={u.id} className="row-card row-card--wrap">
+                <Avatar name={u.name} size="md" />
+                <div className="row-card__main">
+                  <div className="row-card__title">{u.name}</div>
+                  <div className="row-card__meta">{u.email}{u.department && <><span className="dot-sep" />{u.department}</>}<span className="dot-sep" />joined {formatDistanceToNow(new Date(u.created_at), { addSuffix: true })}</div>
+                </div>
+                <div className="admin__actions">
+                  <Button size="sm" leftIcon={<Check size={14} />} onClick={() => approveReq(u)}>Approve as faculty</Button>
+                  <Button size="sm" variant="ghost" className="gcard__danger" onClick={() => rejectReq(u)}>Reject</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        {tab === 'announce' && (
+          <div className="admin__split">
+            <Card>
+              <h2 className="ui-card__title">New announcement</h2>
+              <form className="upload-form" onSubmit={postAnnouncement}>
+                <Input label="Title" required maxLength={255} value={annForm.title} onChange={(e) => setAnnForm((f) => ({ ...f, title: e.target.value }))} />
+                <Textarea label="Message" required maxLength={5000} value={annForm.content} onChange={(e) => setAnnForm((f) => ({ ...f, content: e.target.value }))} />
+                <Select label="Priority" value={annForm.priority} onChange={(e) => setAnnForm((f) => ({ ...f, priority: e.target.value }))}>
+                  <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option>
+                </Select>
+                <div><Button type="submit" loading={posting} leftIcon={<Megaphone size={16} />}>Post announcement</Button></div>
+              </form>
+            </Card>
+            <div className="stack">
+              {announcements.length === 0 ? <Card><EmptyState icon={Megaphone} title="No announcements" text="Posted announcements show up on everyone's dashboard." /></Card>
+                : announcements.map((a) => (
+                  <article key={a.id} className={`ann ann--${a.priority}`}>
+                    <div className="ann__top"><h3 className="ann__title">{a.title}</h3><PriorityBadge priority={a.priority} /></div>
+                    <p className="ann__body">{a.content}</p>
+                    <div className="ann__meta admin__ann-foot"><span>{a.creator_name} · {new Date(a.created_at).toLocaleDateString()}</span>
+                      <button type="button" className="members__remove" onClick={() => removeAnnouncement(a)} aria-label={`Delete ${a.title}`}><Trash2 size={15} /></button></div>
+                  </article>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Overview */}
-      {tab === 'stats' && (
-        <div>
-          {statsLoading ? (
-            <div className="stats-grid" style={{ marginBottom: 24 }}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="stat-box">
-                  <div className="stat-box-value skeleton" style={{ width: 90, height: 30 }} />
-                  <div className="stat-box-label skeleton" style={{ width: 110, height: 12, marginTop: 8 }} />
-                </div>
-              ))}
-            </div>
-          ) : stats ? (
-            <div className="stats-grid" style={{ marginBottom: 24 }}>
-              <StatBox label="Total Users" value={stats.users} color="var(--navy)" onClick={() => setTab('users')} />
-              <StatBox label="Approved Files" value={stats.files} color="var(--blue)" onClick={() => setTab('files')} />
-              <StatBox label="Pending Files" value={stats.pending} color="var(--red)" onClick={() => setTab('files')} />
-              <StatBox label="Study Groups" value={stats.groups} color="var(--gold)" onClick={() => setTab('users')} />
-              <StatBox label="Total Messages" value={stats.messages} color="#8B4A9C" onClick={() => setTab('announce')} />
-              <StatBox label="Total Downloads" value={stats.downloads} color="var(--green)" onClick={() => setTab('files')} />
-            </div>
-          ) : (
-            <div className="card" style={{ padding: 18, textAlign: 'center' }}>
-              <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>No overview data</div>
-              <div style={{ color: 'var(--gray-500)', marginBottom: 12 }}>We couldn't fetch admin statistics right now.</div>
-              {statsError && <div style={{ color: 'var(--red)', marginBottom: 10, fontSize: 13 }}>{statsError}</div>}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                <button className="btn btn-outline" onClick={() => loadStats(3)}>Retry</button>
-                <button className="btn btn-primary" onClick={() => { loadStats(1); setTab('files') }}>Try files tab</button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* File Approvals */}
-      {tab === 'files' && (
-        <div>
-          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Pending File Approvals ({pendingFiles.length})</h2>
-          {pendingFiles.length === 0 ? (
-            <div className="empty-state"><CheckCircle size={48} className="empty-icon" /><div className="empty-title">All clear!</div><div className="empty-text">No files pending approval.</div></div>
-          ) : (
-            <div className="table-wrapper">
-              <table>
-                <thead><tr><th>Title</th><th>Uploaded By</th><th>Dept · Year</th><th>Type</th><th>Size</th><th>Date</th><th>Actions</th></tr></thead>
-                <tbody>
-                  {pendingFiles.map(f => (
-                    <tr key={f.id}>
-                      <td><div style={{ fontWeight: 500, fontSize: 14 }}>{f.title}</div>{f.subject && <div style={{ fontSize: 12, color: 'var(--gray-400)' }}>{f.subject}</div>}</td>
-                      <td><div style={{ fontSize: 13 }}>{f.uploader_name}</div><div style={{ fontSize: 11, color: 'var(--gray-400)' }}>{f.uploader_email}</div></td>
-                      <td><span style={{ fontSize: 13 }}>{[f.department, f.year].filter(Boolean).join(' · ') || '—'}</span></td>
-                      <td><span className={`badge badge-${f.file_type === 'paper' ? 'red' : 'blue'}`}>{f.file_type}</span></td>
-                      <td style={{ fontSize: 13, color: 'var(--gray-500)' }}>{f.file_size}</td>
-                      <td style={{ fontSize: 13, color: 'var(--gray-500)' }}>{new Date(f.created_at).toLocaleDateString('en-IN')}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <a href={f.file_url} target="_blank" rel="noreferrer" className="btn btn-outline btn-xs btn-icon" title="Preview"><Eye size={13} /></a>
-                          <button className="btn btn-gold btn-xs" onClick={() => approveFile(f.id)}><CheckCircle size={13} /> Approve</button>
-                          <button className="btn btn-danger btn-xs" onClick={() => rejectFile(f.id)}><XCircle size={13} /> Reject</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Users */}
-      {tab === 'users' && (
-        <div>
-          <div className="flex-between" style={{ marginBottom: 16 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 700 }}>User Management</h2>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowCreateUser(true)}><UserPlus size={15} /> Add User</button>
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-            <input className="form-input" placeholder="Search by name or email..." style={{ maxWidth: 320 }}
-              value={userSearch} onChange={e => setUserSearch(e.target.value)} />
-            <select className="form-select" style={{ width: 'auto' }} value={roleFilter} onChange={e => setRoleFilter(e.target.value)}>
-              <option value="">All roles</option>
-              <option value="student">Student</option>
-              <option value="faculty">Faculty</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
-          <div className="table-wrapper">
-            <table>
-              <thead><tr><th>Name</th><th>Email</th><th>Dept · Year</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
-              <tbody>
-                {users.map(u => (
-                  <tr key={u.id}>
-                    <td style={{ fontWeight: 500, fontSize: 14 }}>{u.name}</td>
-                    <td style={{ fontSize: 13, color: 'var(--gray-500)' }}>{u.email}</td>
-                    <td style={{ fontSize: 13 }}>{[u.department, u.year].filter(Boolean).join(' · ') || '—'}</td>
-                    <td>
-                      <select style={{ border: '1px solid var(--gray-200)', borderRadius: 6, padding: '3px 8px', fontSize: 12, cursor: 'pointer' }}
-                        value={u.role} onChange={e => changeRole(u.id, e.target.value)}>
-                        <option value="student">Student</option>
-                        <option value="faculty">Faculty</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </td>
-                    <td>
-                      <span className={`badge ${u.is_active ? 'badge-green' : 'badge-red'}`}>
-                        {u.is_active ? 'Active' : 'Suspended'}
-                      </span>
-                    </td>
-                    <td style={{ fontSize: 12, color: 'var(--gray-400)' }}>{new Date(u.created_at).toLocaleDateString('en-IN')}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn btn-outline btn-xs" onClick={() => toggleUser(u.id, u.is_active)}>
-                          {u.is_active ? 'Suspend' : 'Activate'}
-                        </button>
-                        <button className="btn btn-danger btn-xs btn-icon" onClick={() => deleteUser(u.id)}><Trash2 size={12} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Create user modal */}
-          {showCreateUser && (
-            <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowCreateUser(false)}>
-              <div className="modal">
-                <div className="modal-header">
-                  <span className="modal-title">Add New User</span>
-                  <button className="btn btn-ghost btn-icon" onClick={() => setShowCreateUser(false)}><X size={18} /></button>
-                </div>
-                <form onSubmit={createUser}>
-                  <div className="modal-body">
-                    {['name', 'email', 'password'].map(k => (
-                      <div className="form-group" key={k}>
-                        <label className="form-label" style={{ textTransform: 'capitalize' }}>{k} *</label>
-                        <input className="form-input" type={k === 'password' ? 'password' : 'text'} required
-                          value={newUser[k]} onChange={e => setNewUser(u => ({ ...u, [k]: e.target.value }))} />
-                      </div>
-                    ))}
-                    <div className="form-group">
-                      <label className="form-label">Role</label>
-                      <select className="form-select" value={newUser.role} onChange={e => setNewUser(u => ({ ...u, role: e.target.value }))}>
-                        <option value="student">Student</option>
-                        <option value="faculty">Faculty</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                    </div>
-                    <div className="grid-2" style={{ gap: 12 }}>
-                      <div className="form-group">
-                        <label className="form-label">Department</label>
-                        <input className="form-input" value={newUser.department} onChange={e => setNewUser(u => ({ ...u, department: e.target.value }))} />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Year</label>
-                        <input className="form-input" value={newUser.year} onChange={e => setNewUser(u => ({ ...u, year: e.target.value }))} />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="modal-footer">
-                    <button type="button" className="btn btn-outline" onClick={() => setShowCreateUser(false)}>Cancel</button>
-                    <button type="submit" className="btn btn-primary"><UserPlus size={15} /> Create User</button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Announcements */}
-      {tab === 'announce' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 24, alignItems: 'start' }}>
-          <div>
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Active Announcements</h2>
-            {announcements.length === 0 ? (
-              <div className="empty-state"><Bell size={40} className="empty-icon" /><div className="empty-title">No announcements</div></div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {announcements.map(a => (
-                  <div key={a.id} className={`announcement-card ${a.priority}`} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, fontSize: 14 }}>{a.title}</span>
-                        <span className={`badge badge-${a.priority === 'high' ? 'red' : a.priority === 'medium' ? 'blue' : 'gold'}`}>{a.priority}</span>
-                      </div>
-                      <p style={{ fontSize: 13, color: 'var(--gray-600)', lineHeight: 1.5 }}>{a.content}</p>
-                      <div style={{ fontSize: 11, color: 'var(--gray-400)', marginTop: 8 }}>
-                        Posted by {a.creator_name} · {new Date(a.created_at).toLocaleDateString('en-IN')}
-                      </div>
-                    </div>
-                    <button className="btn btn-ghost btn-icon" onClick={() => deleteAnn(a.id)}><Trash2 size={14} color="var(--red)" /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card">
-            <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Post Announcement</h2>
-            <form onSubmit={postAnnouncement} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Title *</label>
-                <input className="form-input" placeholder="Announcement title" required
-                  value={annForm.title} onChange={e => setAnnForm(f => ({ ...f, title: e.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Message *</label>
-                <textarea className="form-input" placeholder="Write your announcement..." required
-                  value={annForm.content} onChange={e => setAnnForm(f => ({ ...f, content: e.target.value }))} style={{ minHeight: 100 }} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Priority</label>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['low', 'medium', 'high'].map(p => (
-                    <button key={p} type="button" onClick={() => setAnnForm(f => ({ ...f, priority: p }))}
-                      style={{
-                        flex: 1, padding: '7px', border: `2px solid ${annForm.priority === p ? (p === 'high' ? 'var(--red)' : p === 'medium' ? 'var(--blue)' : 'var(--gold)') : 'var(--gray-200)'}`,
-                        borderRadius: 'var(--radius-sm)', background: annForm.priority === p ? (p === 'high' ? 'rgba(192,57,43,0.08)' : p === 'medium' ? 'rgba(26,95,168,0.08)' : 'var(--gold-pale)') : '#fff',
-                        color: p === 'high' ? 'var(--red)' : p === 'medium' ? 'var(--blue)' : '#7a5f1a',
-                        cursor: 'pointer', fontSize: 13, fontWeight: 500, textTransform: 'capitalize', transition: 'all 0.15s'
-                      }}>{p}</button>
-                  ))}
-                </div>
-              </div>
-              <button type="submit" className="btn btn-primary" style={{ justifyContent: 'center' }}>
-                <Bell size={15} /> Post Announcement
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {preview && <PreviewModal file={preview} onClose={() => setPreview(null)} onDownload={download} />}
+      {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} onCreated={() => { loadUsers(); loadStats() }} />}
+      <ConfirmDialog open={!!confirm} danger={confirm?.danger} title={confirm?.title} message={confirm?.message} confirmLabel={confirm?.confirmLabel}
+        onCancel={() => setConfirm(null)} onConfirm={runConfirm} />
     </div>
   )
 }

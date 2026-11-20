@@ -1,0 +1,4 @@
+.otp { display: flex; gap: var(--space-2); justify-content: center; }
+.otp__box { width: 100%; max-width: 52px; height: 56px; text-align: center; font-family: var(--font-mono); font-size: var(--fs-24); color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-md); transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease); }
+.otp__box:focus { outline: none; border-color: var(--focus-ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 25%, transparent); }
+.otp__box:disabled { opacity: 0.6; }

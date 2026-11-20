@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
-const { pool , initDB } = require('../config/db');
-const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
+const { pool } = require('../config/db');
+const { uploadToCloudinary, deleteFromCloudinary, cloudinary, sanitizeFilename } = require('../config/cloudinary');
 
 // ✅ POST /api/files/upload
 const uploadFile = async (req, res) => {
@@ -11,10 +11,6 @@ const uploadFile = async (req, res) => {
 
     const { title, description, file_type, department, year, subject } = req.body;
 
-    if (!title) {
-      return res.status(400).json({ message: 'Title is required' });
-    }
-
     const result = await uploadToCloudinary(req.file.buffer, req.file.originalname);
 
     const id = uuidv4();
@@ -23,11 +19,13 @@ const uploadFile = async (req, res) => {
     const file_size = `${(result.bytes / 1024 / 1024).toFixed(2)} MB`;
     const is_approved = ['admin', 'faculty'].includes(req.user.role);
 
+    try {
     await pool.query(
       `INSERT INTO files
         (id, title, description, file_url, cloudinary_public_id,
-         file_type, department, year, subject, file_size, uploaded_by, is_approved)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+         file_type, department, year, subject, file_size, uploaded_by, is_approved,
+         resource_type, original_name, mime_type, size_bytes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
       [
         id,
         title,
@@ -40,9 +38,18 @@ const uploadFile = async (req, res) => {
         subject || null,
         file_size,
         req.user.id,
-        is_approved
+        is_approved,
+        result.resource_type,
+        sanitizeFilename(req.file.originalname),
+        req.file.mimetype,
+        req.file.size
       ]
     );
+    } catch (dbErr) {
+      // Don't leave an orphan asset in Cloudinary
+      await cloudinary.uploader.destroy(cloudinary_pub, { resource_type: result.resource_type }).catch(() => {});
+      throw dbErr;
+    }
 
     const { rows } = await pool.query(
       `SELECT f.*, u.name AS uploader_name
@@ -60,14 +67,16 @@ const uploadFile = async (req, res) => {
     });
   } catch (err) {
     console.error('Upload error:', err);
-    res.status(500).json({ message: err.message || 'Error uploading file' });
+    res.status(500).json({ message: 'Error uploading file' });
   }
 };
 
 // ✅ GET /api/files
 const getFiles = async (req, res) => {
   try {
-    const { dept, year, type, search, page = 1, limit = 20 } = req.query;
+    const { dept, year, type, search, sort } = req.query;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
 
     let where = ['f.is_approved = TRUE'];
     let params = [];
@@ -93,19 +102,20 @@ const getFiles = async (req, res) => {
       where.push(`(f.title ILIKE $${params.length - 1} OR f.subject ILIKE $${params.length})`);
     }
 
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (page - 1) * limit;
 
-    const queryParams = [...params, parseInt(limit), offset];
+    const queryParams = [...params, limit, offset];
 
     const { rows: files } = await pool.query(
-      `SELECT f.*, u.name AS uploader_name
+      `SELECT f.*, u.name AS uploader_name,
+              EXISTS(SELECT 1 FROM bookmarks b WHERE b.file_id = f.id AND b.user_id = $${params.length + 3}) AS is_bookmarked
        FROM files f
        JOIN users u ON f.uploaded_by = u.id
        WHERE ${where.join(' AND ')}
-       ORDER BY f.created_at DESC
+       ORDER BY ${sort === 'downloads' ? 'f.download_count DESC, f.created_at DESC' : 'f.created_at DESC'}
        LIMIT $${params.length + 1}
        OFFSET $${params.length + 2}`,
-      queryParams
+      [...queryParams, req.user.id]
     );
 
     const { rows: countRows } = await pool.query(
@@ -120,12 +130,108 @@ const getFiles = async (req, res) => {
     res.json({
       files,
       total,
-      page: parseInt(page),
+      page,
       pages: Math.ceil(total / limit),
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error fetching files' });
+  }
+};
+
+// ✅ GET /api/files/mine — your own uploads, including pending ones
+const getMyFiles = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.*, u.name AS uploader_name
+       FROM files f JOIN users u ON f.uploaded_by = u.id
+       WHERE f.uploaded_by = $1
+       ORDER BY f.created_at DESC
+       LIMIT 200`,
+      [req.user.id]
+    );
+    res.json({ files: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching your files' });
+  }
+};
+
+// GET /api/files/saved - your bookmarked (approved) files
+const getSavedFiles = async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT f.*, u.name AS uploader_name, TRUE AS is_bookmarked
+       FROM bookmarks b
+       JOIN files f ON f.id = b.file_id
+       JOIN users u ON f.uploaded_by = u.id
+       WHERE b.user_id = $1 AND f.is_approved = TRUE
+       ORDER BY b.created_at DESC
+       LIMIT 200`,
+      [req.user.id]
+    );
+    res.json({ files: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error fetching saved files' });
+  }
+};
+
+// POST /api/files/:id/bookmark
+const addBookmark = async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT id FROM files WHERE id = $1 AND is_approved = TRUE`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'File not found' });
+    await pool.query(
+      `INSERT INTO bookmarks (user_id, file_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [req.user.id, req.params.id]
+    );
+    res.json({ message: 'Saved' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error saving file' });
+  }
+};
+
+// DELETE /api/files/:id/bookmark
+const removeBookmark = async (req, res) => {
+  try {
+    await pool.query(`DELETE FROM bookmarks WHERE user_id = $1 AND file_id = $2`, [req.user.id, req.params.id]);
+    res.json({ message: 'Removed from saved' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error removing bookmark' });
+  }
+};
+
+// PUT /api/files/:id - edit metadata (owner or admin)
+const updateFile = async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT uploaded_by FROM files WHERE id = $1`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ message: 'File not found' });
+    if (rows[0].uploaded_by !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorised to edit this file' });
+    }
+
+    const sets = [];
+    const params = [];
+    for (const col of ['title', 'description', 'subject', 'file_type', 'department', 'year']) {
+      if (req.body[col] !== undefined) {
+        params.push(req.body[col] === '' ? null : req.body[col]);
+        sets.push(`${col} = $${params.length}`);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ message: 'Nothing to update' });
+
+    params.push(req.params.id);
+    const { rows: updated } = await pool.query(
+      `UPDATE files SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING *`,
+      params
+    );
+    res.json({ file: updated[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error updating file' });
   }
 };
 
@@ -181,7 +287,10 @@ const deleteFile = async (req, res) => {
     }
 
     if (file.cloudinary_public_id) {
-      await deleteFromCloudinary(file.cloudinary_public_id, file.title);
+      const del = await deleteFromCloudinary(file.cloudinary_public_id, file.resource_type);
+      if (del?.result !== 'ok' && del?.result !== 'not found') {
+        console.error('Cloudinary delete unexpected result:', del?.result);
+      }
     }
 
     await pool.query(`DELETE FROM files WHERE id = $1`, [req.params.id]);
@@ -222,6 +331,11 @@ const incrementDownload = async (req, res) => {
 module.exports = {
   uploadFile,
   getFiles,
+  getMyFiles,
+  getSavedFiles,
+  addBookmark,
+  removeBookmark,
+  updateFile,
   getPendingFiles,
   approveFile,
   deleteFile,

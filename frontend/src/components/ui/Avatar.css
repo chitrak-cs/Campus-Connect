@@ -1,0 +1,8 @@
+.ui-avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 50%; color: #fff; font-weight: 600; overflow: hidden; background: var(--primary); user-select: none; }
+.ui-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ui-avatar--xs { width: 24px; height: 24px; font-size: 10px; }
+.ui-avatar--sm { width: 30px; height: 30px; font-size: 11px; }
+.ui-avatar--md { width: 38px; height: 38px; font-size: 13px; }
+.ui-avatar--lg { width: 56px; height: 56px; font-size: 18px; }
+.ui-avatar--xl { width: 88px; height: 88px; font-size: 28px; }
+.ui-avatar[data-initials]::after { content: attr(data-initials); }

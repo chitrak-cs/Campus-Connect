@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { getTabId, tokenKey } from './tabSession';
+import { getToken, clearAuth } from './authStorage';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -7,28 +7,19 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  try {
-    const tabId = getTabId()
-    const token = localStorage.getItem(tokenKey(tabId))
-    if (token) config.headers.Authorization = `Bearer ${token}`
-  } catch (e) {
-    console.error('Failed to get token', e);
-  }
-  return config
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
 });
 
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
-      try {
-        const tabId = getTabId()
-        localStorage.removeItem(tokenKey(tabId))
-        localStorage.removeItem(`au_user_${tabId}`)
-      } catch (e) {
-        console.error('Failed to remove token', e);
-      }
-      window.location.href = '/login'
+    const url = err.config?.url || '';
+    const isAuthCall = /^\/auth\/(login|register|verify-otp|forgot|reset|resend)/.test(url);
+    if (err.response?.status === 401 && !isAuthCall) {
+      clearAuth();
+      window.dispatchEvent(new Event('auth:logout'))
     }
     return Promise.reject(err);
   }

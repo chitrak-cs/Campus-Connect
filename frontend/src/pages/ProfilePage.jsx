@@ -1,103 +1,128 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Camera, LogOut, Upload, Download, Users, Info } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { useAuth } from '../context/AuthContext'
 import api from '../utils/api'
-import toast from 'react-hot-toast'
-import { User, Save, LogOut } from 'lucide-react'
+import StatCard from '../components/StatCard'
+import PasswordInput from '../components/PasswordInput'
+import { PageHeader, Card, Button, Input, Select, Textarea, Avatar, RoleBadge, Badge } from '../components/ui'
+import '../styles/pages/profile.css'
 
 const DEPTS = ['CSE', 'ECE', 'EEE', 'ME', 'CE', 'BCA', 'MCA', 'MBA', 'BBA', 'Law', 'Pharmacy', 'Other']
 const YEARS = ['1st Year', '2nd Year', '3rd Year', '4th Year', 'PG 1st Year', 'PG 2nd Year', 'Faculty']
 
-function getInitials(name) {
-  return name?.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'AU'
-}
-
 export default function ProfilePage() {
-  const { user, updateUser, logout } = useAuth()
-  const [form, setForm] = useState({ name: user?.name || '', department: user?.department || '', year: user?.year || '' })
-  const [loading, setLoading] = useState(false)
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+  const { user, updateUser, setSession, logout } = useAuth()
+  const fileRef = useRef(null)
+  const [form, setForm] = useState({ name: user?.name || '', department: user?.department || '', year: user?.year || '', bio: user?.bio || '' })
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [pw, setPw] = useState({ current: '', next: '' })
+  const [pwError, setPwError] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [activity, setActivity] = useState(null)
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+
+  useEffect(() => { document.title = 'Profile · Campus Connect' }, [])
+  useEffect(() => {
+    Promise.all([api.get('/files/mine'), api.get('/groups')]).then(([mine, groups]) => {
+      const files = mine.data.files || []
+      setActivity({ uploads: files.length, downloads: files.reduce((n, f) => n + (f.download_count || 0), 0), groups: (groups.data.groups || []).filter((g) => g.is_member).length })
+    }).catch(() => setActivity({}))
+  }, [])
+
+  // Pull the full profile (bio etc.) once
+  useEffect(() => {
+    api.get('/auth/me').then((r) => { updateUser(r.data.user); setForm({ name: r.data.user.name || '', department: r.data.user.department || '', year: r.data.user.year || '', bio: r.data.user.bio || '' }) }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async (e) => {
     e.preventDefault()
-    setLoading(true)
+    setSaving(true)
+    try { const res = await api.put('/auth/profile', form); updateUser(res.data.user); toast.success('Profile updated') }
+    catch (err) { toast.error(err.response?.data?.message || 'Update failed') } finally { setSaving(false) }
+  }
+
+  const pickAvatar = async (e) => {
+    const file = e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+    if (!['image/jpeg', 'image/png'].includes(file.type)) return toast.error('Use a JPG or PNG image')
+    if (file.size > 2 * 1024 * 1024) return toast.error('Image is too large (max 2 MB)')
+    const fd = new FormData(); fd.append('avatar', file)
+    setUploading(true)
     try {
-      const res = await api.put('/auth/profile', form)
-      updateUser(res.data.user)
-      toast.success('Profile updated!')
-    } catch { toast.error('Update failed') }
-    finally { setLoading(false) }
+      const res = await api.post('/auth/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+      updateUser(res.data.user); toast.success('Photo updated')
+    } catch (err) { toast.error(err.response?.data?.message || 'Could not upload photo') } finally { setUploading(false) }
+  }
+
+  const changePassword = async (e) => {
+    e.preventDefault()
+    if (pw.next.length < 8) return setPwError('Use at least 8 characters')
+    setPwSaving(true); setPwError('')
+    try {
+      const res = await api.put('/auth/password', { currentPassword: pw.current, newPassword: pw.next })
+      setSession(res.data.token)     // this session stays signed in; others are signed out
+      setPw({ current: '', next: '' }); toast.success('Password changed. Other devices were signed out.')
+    } catch (err) { setPwError(err.response?.data?.message || 'Could not change password') } finally { setPwSaving(false) }
   }
 
   return (
-    <div style={{ maxWidth: 560 }}>
-      <h1 className="page-title" style={{ marginBottom: 4 }}>My Profile</h1>
-      <p className="page-subtitle" style={{ marginBottom: 28 }}>Manage your account information</p>
+    <div className="profile">
+      <PageHeader title="Profile" subtitle="Manage your account" />
 
-      <div className="card" style={{ marginBottom: 20 }}>
-        {/* Avatar header */}
-        <div className="profile-header">
-          <div className="avatar lg" style={{ width: 64, height: 64, fontSize: 20 }}>
-            {user?.avatar_url
-              ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-              : getInitials(user?.name)}
+      <div className="stat-grid">
+        <StatCard icon={Upload} label="My uploads" value={activity?.uploads} tone="info" loading={!activity} />
+        <StatCard icon={Download} label="Downloads of my files" value={activity?.downloads} tone="success" loading={!activity} />
+        <StatCard icon={Users} label="Groups joined" value={activity?.groups} tone="accent" loading={!activity} />
+      </div>
+
+      <div className="profile__grid">
+        <Card>
+          <div className="profile__head">
+            <div className="profile__avatar">
+              <Avatar name={user?.name} src={user?.avatar_url} size="xl" />
+              <button type="button" className="profile__cam" onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Change profile photo"><Camera size={16} /></button>
+              <input ref={fileRef} type="file" hidden aria-label="Choose a profile photo" accept="image/jpeg,image/png" onChange={pickAvatar} />
+            </div>
+            <div>
+              <h2 className="profile__name">{user?.name}</h2>
+              <p className="muted">{user?.email}</p>
+              <div className="profile__badges"><RoleBadge role={user?.role} />{user?.requested_role && <Badge tone="warning">Faculty request pending</Badge>}</div>
+            </div>
           </div>
-          <div>
-            <div className="profile-name">{user?.name}</div>
-            <div className="profile-email">{user?.email}</div>
-            <span className="badge badge-gold" style={{ marginTop: 6, textTransform: 'capitalize' }}>{user?.role}</span>
-          </div>
+          {user?.requested_role && (
+            <div className="auth__banner auth__banner--info" role="note"><Info size={16} aria-hidden="true" className="banner-icon" />An admin will review your faculty request. You'll keep student access until then.</div>
+          )}
+          <form className="profile__form" onSubmit={save}>
+            <Input label="Full name" required maxLength={100} value={form.name} onChange={(e) => set('name', e.target.value)} />
+            <Input label="Email" value={user?.email || ''} disabled hint="Email can't be changed. Contact an admin if needed." />
+            <div className="upload-form__row">
+              <Select label="Department" value={form.department} onChange={(e) => set('department', e.target.value)}><option value="">None</option>{DEPTS.map((d) => <option key={d}>{d}</option>)}</Select>
+              <Select label="Year" value={form.year} onChange={(e) => set('year', e.target.value)}><option value="">None</option>{YEARS.map((y) => <option key={y}>{y}</option>)}</Select>
+            </div>
+            <Textarea label="Bio" maxLength={500} placeholder="A line or two about you" value={form.bio} onChange={(e) => set('bio', e.target.value)} hint={`${form.bio.length}/500`} />
+            <div><Button type="submit" loading={saving}>Save changes</Button></div>
+          </form>
+        </Card>
+
+        <div className="profile__side">
+          <Card>
+            <h2 className="ui-card__title">Change password</h2>
+            <form className="profile__form" onSubmit={changePassword}>
+              <PasswordInput label="Current password" autoComplete="current-password" value={pw.current} onChange={(e) => { setPw((p) => ({ ...p, current: e.target.value })); setPwError('') }} required />
+              <PasswordInput label="New password" autoComplete="new-password" placeholder="At least 8 characters" value={pw.next} error={pwError} onChange={(e) => { setPw((p) => ({ ...p, next: e.target.value })); setPwError('') }} required />
+              <p className="ui-field__msg">You'll stay signed in here. Other devices will be signed out.</p>
+              <div><Button type="submit" variant="secondary" loading={pwSaving}>Update password</Button></div>
+            </form>
+          </Card>
+          <Card>
+            <h2 className="ui-card__title">Session</h2>
+            <Button variant="secondary" leftIcon={<LogOut size={16} />} onClick={logout}>Sign out</Button>
+          </Card>
         </div>
-
-        <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="form-group">
-            <label className="form-label">Full Name</label>
-            <input className="form-input" value={form.name} onChange={e => set('name', e.target.value)} required />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input className="form-input" value={user?.email} disabled style={{ background: 'var(--gray-50)', color: 'var(--gray-400)' }} />
-            <span style={{ fontSize: 11, color: 'var(--gray-400)' }}>Email cannot be changed. Contact admin if needed.</span>
-          </div>
-          <div className="grid-2" style={{ gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Department</label>
-              <select className="form-select" value={form.department} onChange={e => set('department', e.target.value)}>
-                <option value="">Select</option>
-                {DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Year</label>
-              <select className="form-select" value={form.year} onChange={e => set('year', e.target.value)}>
-                <option value="">Select</option>
-                {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
-            </div>
-          </div>
-          <button type="submit" className="btn btn-primary" disabled={loading} style={{ alignSelf: 'flex-start', marginTop: 4 }}>
-            {loading ? <span className="spinner" style={{ width: 16, height: 16 }} /> : <><Save size={15} /> Save Changes</>}
-          </button>
-        </form>
       </div>
-
-      {/* Info card */}
-      <div className="card" style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 14 }}>Account Details</h3>
-        {[
-          ['Role', user?.role],
-          ['Department', user?.department || '—'],
-          ['Year', user?.year || '—'],
-        ].map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--gray-50)', fontSize: 14 }}>
-            <span style={{ color: 'var(--gray-500)' }}>{k}</span>
-            <span style={{ fontWeight: 500, textTransform: 'capitalize' }}>{v}</span>
-          </div>
-        ))}
-      </div>
-
-      <button className="btn btn-outline" onClick={logout} style={{ color: 'var(--red)', borderColor: 'rgba(192,57,43,0.3)' }}>
-        <LogOut size={15} /> Sign Out
-      </button>
     </div>
   )
 }
