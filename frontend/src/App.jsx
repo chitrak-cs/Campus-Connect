@@ -1,19 +1,22 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout'
 import { Spinner } from './components/ui'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import Dashboard from './pages/Dashboard'
-import FilesPage from './pages/FilesPage'
-import ChatPage from './pages/ChatPage'
-import GroupsPage from './pages/GroupsPage'
-import AdminPage from './pages/AdminPage'
-import ProfilePage from './pages/ProfilePage'
-import NotFoundPage from './pages/NotFoundPage'
 import ServerWakeBanner from './components/ServerWakeBanner'
+
+// Heavy pages are fetched on demand (Landing and Login stay in the main bundle for a fast first paint)
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const FilesPage = lazy(() => import('./pages/FilesPage'))
+const ChatPage = lazy(() => import('./pages/ChatPage'))
+const GroupsPage = lazy(() => import('./pages/GroupsPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 const Splash = () => (
   <div className="splash">
@@ -50,6 +53,7 @@ export default function App() {
   return (
     <>
     <ServerWakeBanner />
+    <Suspense fallback={<Splash />}>
     <Routes>
       <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
@@ -64,6 +68,7 @@ export default function App() {
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
     </>
   )
 }

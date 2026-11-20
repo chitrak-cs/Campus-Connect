@@ -1,5 +1,5 @@
 const { v4: uuidv4 } = require('uuid');
-const { pool , initDB } = require('../config/db');
+const { pool } = require('../config/db');
 const { uploadToCloudinary, deleteFromCloudinary, cloudinary, sanitizeFilename } = require('../config/cloudinary');
 
 // ✅ POST /api/files/upload

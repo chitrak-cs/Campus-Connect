@@ -37,9 +37,10 @@ const upload = multer({
   },
 });
 
-// Strip path separators / control chars; cap length
+// Strip path separators (/ and \) and control characters on purpose; cap length
 const sanitizeFilename = (name = '') =>
-  name.replace(/[\/\x00-\x1f\x7f]/g, '_').replace(/^\.+/, '').slice(0, 200) || 'file';
+  // eslint-disable-next-line no-control-regex
+  name.replace(/[\\/\x00-\x1f\x7f]/g, '_').replace(/^\.+/, '').slice(0, 200) || 'file';
 
 // Cloudinary public id: "<slug>_<random>" (+ ".<ext>" for raw files, so the URL ends in .pdf/.docx
 // and Cloudinary serves the correct Content-Type and download filename).

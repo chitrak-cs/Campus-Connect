@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -8,7 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import useNotifications from '../hooks/useNotifications'
-import { Avatar, DropdownMenu } from './ui'
+import { Avatar, DropdownMenu, Spinner } from './ui'
 import CommandPalette from './CommandPalette'
 import '../styles/layout.css'
 
@@ -175,7 +175,9 @@ export default function Layout() {
           </div>
         </header>
         <main id="main" className="shell-content" tabIndex={-1}>
-          <Outlet />
+          <Suspense fallback={<div className="center-pad"><Spinner size="lg" /></div>}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

@@ -54,7 +54,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="landing__shot">
-          <img src="/landing-preview.webp" alt="Campus Connect dashboard showing recent files, announcements and quick actions" width="800" height="503" fetchpriority="high" />
+          <img src="/landing-preview.webp" alt="Campus Connect dashboard showing recent files, announcements and quick actions" width="800" height="503" fetchPriority="high" />
         </div>
       </section>
 

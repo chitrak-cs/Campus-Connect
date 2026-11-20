@@ -7,6 +7,7 @@ export default function DropdownMenu({ trigger, items = [], panel, align = 'righ
   const rootRef = useRef(null)
   const menuId = useId()
   const visible = items.filter((i) => !i.hidden)
+  const hasPanel = !!panel
 
   useEffect(() => {
     if (!open) return
@@ -14,9 +15,9 @@ export default function DropdownMenu({ trigger, items = [], panel, align = 'righ
     const onKey = (e) => { if (e.key === 'Escape') { setOpen(false); rootRef.current?.querySelector('[aria-haspopup]')?.focus() } }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
-    if (!panel) rootRef.current?.querySelector('[role="menuitem"]')?.focus()
+    if (!hasPanel) rootRef.current?.querySelector('[role="menuitem"]')?.focus()
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onKey) }
-  }, [open])
+  }, [open, hasPanel])
 
   const onMenuKey = (e) => {
     const els = [...rootRef.current.querySelectorAll('[role="menuitem"]')]
