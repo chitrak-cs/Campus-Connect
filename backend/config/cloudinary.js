@@ -1,7 +1,9 @@
+const crypto = require('crypto');
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 const streamifier = require('streamifier');
 require('dotenv').config();
+require('./network');
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -39,17 +41,29 @@ const upload = multer({
 const sanitizeFilename = (name = '') =>
   name.replace(/[\/\x00-\x1f\x7f]/g, '_').replace(/^\.+/, '').slice(0, 200) || 'file';
 
+// Cloudinary public id: "<slug>_<random>" (+ ".<ext>" for raw files, so the URL ends in .pdf/.docx
+// and Cloudinary serves the correct Content-Type and download filename).
+const makePublicId = (originalName, ext, raw) => {
+  const base = (originalName || 'file').replace(/\.[^.]+$/, '')
+    .normalize('NFKD').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase().slice(0, 40) || 'file';
+  const id = `${base}_${crypto.randomBytes(5).toString('hex')}`;
+  return raw ? `${id}.${ext}` : id;
+};
+
 const uploadToCloudinary = (buffer, originalName) => {
   return new Promise((resolve, reject) => {
-    const rule = ALLOWED_TYPES[extOf(originalName)];
+    const ext = extOf(originalName);
+    const rule = ALLOWED_TYPES[ext];
     if (!rule) return reject(new Error('File type not allowed'));
 
     const stream = cloudinary.uploader.upload_stream(
       {
         folder:        'Jadavpur_university',
+        public_id:     makePublicId(originalName, ext, rule.resource === 'raw'),
         resource_type: rule.resource,
-        use_filename:  true,
-        unique_filename: true,
+        use_filename:  false,
+        unique_filename: false,
+        overwrite:     false,
       },
       (error, result) => {
         if (error) return reject(error);
@@ -101,8 +115,8 @@ const uploadAvatarToCloudinary = (buffer) =>
   });
 
 // Public id from a Cloudinary URL: .../upload/v123/folder/name.jpg -> folder/name
-const publicIdFromUrl = (url = '') => {
-  const m = url.match(/\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?((?:Jadavpur_university)\/.+?)\.[a-z0-9]+$/i);
+const publicIdFromUrl = (url) => {
+  const m = (url || '').match(/\/upload\/(?:[^/]+\/)*?(?:v\d+\/)?((?:Jadavpur_university)\/.+?)\.[a-z0-9]+$/i);
   return m ? m[1] : null;
 };
 

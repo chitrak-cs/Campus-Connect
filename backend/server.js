@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./config/network');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -9,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { initDB, pool, cleanupOtps } = require('./config/db');
 const { protect } = require('./middleware/auth');
-const { apiLimiter } = require('./middleware/rateLimit');
+const { apiLimiter, ENABLED: RATE_LIMIT_ON } = require('./middleware/rateLimit');
 const { chatContent, uuid: uuidSchema } = require('./validation/schemas');
 
 // Routes
@@ -77,6 +78,7 @@ const makeBucket = () => {
   let tokens = 8;
   let last = Date.now();
   return () => {
+    if (!RATE_LIMIT_ON) return true;
     const now = Date.now();
     tokens = Math.min(8, tokens + ((now - last) / 10000) * 8);
     last = now;
