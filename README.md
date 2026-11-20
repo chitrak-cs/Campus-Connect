@@ -93,6 +93,29 @@ Security-relevant design choices:
   <img src="README-assets/register.png" width="48%" alt="Create account">
 </p>
 
+**Dashboard**
+
+<p align="center"><img src="README-assets/dashboard.png" width="95%" alt="Dashboard"></p>
+
+**Files** (filters, sorting, preview, saved files)
+
+<p align="center"><img src="README-assets/files.png" width="95%" alt="Files"></p>
+
+**Real-time chat**
+
+<p align="center"><img src="README-assets/chat.png" width="95%" alt="Chat"></p>
+
+**Study groups** (public and private)
+
+<p align="center"><img src="README-assets/groups.png" width="95%" alt="Study groups"></p>
+
+**Profile and Admin**
+
+<p align="center">
+  <img src="README-assets/profile.png" width="48%" alt="Profile">
+  <img src="README-assets/admin.png" width="48%" alt="Admin overview">
+</p>
+
 ---
 
 ## Getting started

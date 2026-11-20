@@ -20,15 +20,10 @@
 .auth__alt a, .auth__link { color: var(--accent-text); font-weight: 600; }
 .auth__alt a:hover, .auth__link:hover { text-decoration: underline; }
 .auth__link-btn { border: 0; background: transparent; padding: 0; font-size: var(--fs-13); }
-.auth__banner { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-3) var(--space-4); border-radius: var(--r-md); font-size: var(--fs-14); margin-bottom: var(--space-4); }
-.auth__banner--warn { background: var(--warning-soft); color: var(--warning); }
-.auth__banner--info { background: var(--info-soft); color: var(--info); }
 .auth__otp { display: flex; flex-direction: column; gap: var(--space-5); }
 .auth__otp-meta { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; font-size: var(--fs-13); color: var(--text-muted); }
 .auth__strength { height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
 .auth__strength > span { display: block; height: 100%; transition: width var(--dur) var(--ease), background var(--dur) var(--ease); }
-.pw-toggle { position: absolute; right: 4px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: var(--text-muted); border-radius: var(--r-sm); }
-.pw-toggle:hover { color: var(--text); }
 @media (max-width: 900px) {
   .auth { grid-template-columns: 1fr; }
   .auth__hero { padding: var(--space-5) var(--space-5) var(--space-6); gap: var(--space-4); }
