@@ -10,7 +10,7 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self' https://campus-connect-backend-4g6v.onrender.com wss://campus-connect-backend-4g6v.onrender.com; frame-src https://res.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://res.cloudinary.com; connect-src 'self' https://campus-connect-api-sg.onrender.com wss://campus-connect-api-sg.onrender.com https://campus-connect-backend-4g6v.onrender.com wss://campus-connect-backend-4g6v.onrender.com; frame-src https://res.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     }
