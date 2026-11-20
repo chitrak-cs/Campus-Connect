@@ -417,16 +417,16 @@ Order matters. Tick each step.
 - [x] **9.4** Open a PR `improve/v2 → main` on GitHub with a summary of the phases and task IDs. Check the Vercel **preview** build for the PR: it builds, routes load, and the CSP doesn't block anything (check the browser console).
 - [x] **9.5** Run the email normalization script (4.2) on production **only after H4 approval**.
 - [x] **9.6** Merge the PR into `main`. This triggers Render and Vercel production deploys. Watch the Render deploy logs for `initDB` errors and the Vercel build logs.
-- [~] **9.7 Post-deploy checks on production:**
-  - [ ] `GET https://<backend>/health` → `{"status":"ok"}`
-  - [ ] Open `/files` directly and refresh → loads (C2)
-  - [ ] Register a new test account and **receive the OTP email** (C3)
-  - [ ] Chat between two browsers is live, typing indicator works, presence works (C1)
-  - [ ] Upload a PDF as a student → pending → approve as admin → preview → download → delete, and it's gone from Cloudinary (B4)
-  - [ ] Private group isolation (S2/S3) with two accounts
-  - [ ] No console errors and no CSP violations
+- [x] **9.7 Post-deploy checks on production:**
+  - [x] `GET https://<backend>/health` → `{"status":"ok"}`
+  - [x] Open `/files` directly and refresh → loads (C2)
+  - [x] Register a new test account and **receive the OTP email** (C3)
+  - [x] Chat between two browsers is live, typing indicator works, presence works (C1)
+  - [x] Upload a PDF as a student → pending → approve as admin → preview → download → delete, and it's gone from Cloudinary (B4)
+  - [x] Private group isolation (S2/S3) with two accounts
+  - [x] No console errors and no CSP violations
 - [x] **9.8 Rollback plan (if something is badly broken):** Vercel → *Instant Rollback* to deployment `dpl_5ughyaipGV7nXKpG9qw7PF5ocXZg`; Render → roll back to the previous deploy; DB → the new columns and indexes are additive and harmless, and the backup branch exists if data was damaged.
-- [ ] **9.9** Delete the test accounts created during QA (ask Chitrak first).
+- [x] **9.9** Delete the test accounts created during QA (ask Chitrak first).
 
 ---
 
@@ -434,7 +434,7 @@ Order matters. Tick each step.
 
 - [x] **10.1** Update `README.md`: features (new ones), live demo link (`https://campus-connect-five-zeta.vercel.app`), the env var table (§12), the architecture diagram (add Brevo, remove Gmail SMTP for prod), setup steps (Neon dev branch, `npm test`), and new screenshots of the redesigned pages (replace `README-assets/*.png`). Remove the "Future Improvements" items that are now done.
 - [x] **10.2** Add `SECURITY.md` with a short summary of the protections (rate limits, OTP policy, role approval, upload validation) and how to report issues.
-- [ ] **10.3** Tick the remaining boxes in this file, and fill in §13 and the summary at the bottom.
+- [x] **10.3** Tick the remaining boxes in this file, and fill in §13 and the summary at the bottom.
 
 ---
 
@@ -533,9 +533,10 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | 9.7 production checks done WITHOUT logging in | Live site (`campus-connect-five-zeta.vercel.app`): new build served; `/files` and `/groups` return 200 on a direct hit (C2); CSP, X-Frame-Options and nosniff headers present; no console errors or CSP violations in the browser; fonts, hero image and real stats (13/2/2) load from the new API through the CSP (C1 path). New API: `/health` ok; CORS allows the Vercel origin; all 46 routes without a token return 401 except the intentionally public ones; unauthenticated socket handshake refused ("Authentication required"); helmet/HSTS headers; forgot-password identical for unknown emails. Latency (5 warm DB-backed requests): Singapore ~0.70 s vs Oregon ~1.0-1.2 s from the same client. Live Lighthouse (mobile) landing: 88 / 100 / 100 / 100 (LCP 3.1 s on the real network). NOT done by me on purpose: anything needing real credentials or an emailed code (register + OTP email via Brevo, login, chat between two accounts, upload/approve/preview/delete a PDF, private group isolation with two accounts). These are the owner's checks (see the hand-off list in chat). |
 | 2026-11-20 | Owner steps left in Render dashboard | (a) Singapore service: Settings -> Branch -> change `improve/v2` to `main` (otherwise it stops following `main`), and Health Check Path -> `/health`. (b) Suspend (do NOT delete) the Oregon service `campus-connect-backend` once the live checks pass. (c) 7.4 (`npm ci` for the Oregon service) is moot because that service is being retired; the new service already uses `npm ci`. |
 | 2026-11-20 | 9.8 rollback | Vercel: Instant Rollback to `dpl_5ughyaipGV7nXKpG9qw7PF5ocXZg` (the pre-v2 deployment; it would still point at whatever `VITE_API_URL` is, so also set it back to the Oregon `/api` URL if rolling back). Render: the Oregon service still exists and runs the same DB. DB: all migrations are additive; `backup-pre-v2` holds the pre-deploy data. |
+| 2026-11-20 | CLOSED OUT | Owner confirmed the live login checks (registration + OTP email, login, chat, upload/approve/preview/delete, private group isolation) and the Render dashboard steps are done. The agent created no accounts on production, so 9.9 had nothing to delete. Open items: stretch features F13-F15 (not started), optional Brevo key rotation, and removing the old Oregon host from the CSP in `frontend/vercel.json` once that service is retired. |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
 
 - Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ◐ (4.2 production UPDATE waits for 9.5)  Phase 5: ☑
-- Phase 6: ☑ (F13-F15 stretch not started)  Phase 7: ☑ (7.4 moot)  Phase 8: ☑  Phase 9: ◐ deployed; owner live checks + Render dashboard steps pending  Phase 10: ◐ (10.3 at the end)
+- Phase 6: ☑ (F13-F15 stretch not started)  Phase 7: ☑ (7.4 moot)  Phase 8: ☑  Phase 9: ☑  Phase 10: ☑
