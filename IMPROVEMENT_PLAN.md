@@ -45,7 +45,7 @@ Tables: `users, files, study_groups, group_members, messages, announcements, otp
   2. In the Neon SQL editor (production branch): `UPDATE users SET password = '<hash from step 1>' WHERE role = 'admin';`
 - [x] **H2 (done 2026-11-20): create a transactional email account** with an HTTPS API (recommended: **Brevo**, which can send from a verified single sender such as your Gmail without owning a domain; alternative: Resend, which needs a domain). Verify the sender address, create an API key and add it to Render as `BREVO_API_KEY` (Task C3).
 - [x] **H3 (decided 2026-11-20: YES, move to Singapore): decide on the backend region** (Task P4): move Render from Oregon to Singapore so it sits next to the database? (Recommended. It's free, but it means creating a new Render service.)
-- [ ] **H4: approve the one-time email lower-casing UPDATE** on production (Task D2).
+- [x] **H4 (approved and applied 2026-11-20; 4 rows): approve the one-time email lower-casing UPDATE** on production (Task D2).
 - [x] **H5 (decided 2026-11-20: allow all email domains; leave `ALLOWED_EMAIL_DOMAINS` unset):** optional. Should registration be restricted to university email domains? If yes, give the domain(s) for `ALLOWED_EMAIL_DOMAINS` (Task S9).
 - [x] **H6 (done, Vercel MCP access works):** when the agent asks, approve the Vercel team-access link (Vercel's MCP needs a per-session grant).
 
@@ -256,7 +256,7 @@ All of this goes in `initDB()` as **idempotent** statements (`IF NOT EXISTS`). R
   CREATE INDEX IF NOT EXISTS idx_group_members_user      ON group_members (user_id);
   CREATE INDEX IF NOT EXISTS idx_otps_user_purpose       ON otps (user_id, purpose);
   ```
-- [~] **4.2 [D2] Case-insensitive unique email.**
+- [x] **4.2 [D2] Case-insensitive unique email.**
   1. Check: `SELECT LOWER(email), COUNT(*) FROM users GROUP BY 1 HAVING COUNT(*) > 1;` (must be empty; if not, stop and ask Chitrak).
   2. **Ask Chitrak (H4)**, then run once on production: `UPDATE users SET email = LOWER(TRIM(email));`. Put this in a script (`backend/scripts/normalize-emails.js`), **not** in `initDB`.
   3. Add `CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_key ON users (LOWER(email));` to `initDB`.
@@ -538,5 +538,5 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 
 ## Progress summary (update at the end of each phase)
 
-- Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ◐ (4.2 production UPDATE waits for 9.5)  Phase 5: ☑
+- Phase 0: ☑  Phase 1: ☑  Phase 2: ☑  Phase 3: ☑  Phase 4: ☑  Phase 5: ☑
 - Phase 6: ☑ (F13-F15 stretch not started)  Phase 7: ☑ (7.4 moot)  Phase 8: ☑  Phase 9: ☑  Phase 10: ☑
