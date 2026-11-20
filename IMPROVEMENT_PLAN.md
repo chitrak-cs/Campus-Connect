@@ -403,7 +403,7 @@ Core features (F1–F12) are in scope. Stretch features (F13–F15) are only for
   - upload of a `.exe` renamed `.pdf` with mime `application/x-msdownload` → 400
   - admin can't demote themselves
 - [x] **8.2** `npm run build` for the frontend passes with no warnings about missing env.
-- [ ] **8.3** Run the **manual QA checklist** (§11) on the Vercel preview, pointed at the dev backend if possible, or on local.
+- [x] **8.3** Run the **manual QA checklist** (§11) on the Vercel preview, pointed at the dev backend if possible, or on local.
 
 ---
 
@@ -442,18 +442,18 @@ Order matters. Tick each step.
 
 Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 
-- [ ] Landing page: real stats, CTAs work, no layout shift
-- [ ] Register (student), register (faculty request), OTP resend countdown, wrong OTP ×6 lockout
-- [ ] Login, wrong password (no reload), forgot password end-to-end, change password logs out the other browser
-- [ ] New tab stays logged in (B1); logout clears everything
-- [ ] Dashboard for a student vs an admin
-- [ ] Files: filters, sort, search, grid/list, upload with progress, preview PDF/image, save/unsave, my uploads with status, edit metadata, delete
-- [ ] Chat: global + group, unread badges, load older, delete own message, linkified URLs, 2000-char limit, Enter vs Shift+Enter, disconnect/reconnect chip
-- [ ] Groups: create public/private, invite code copy and join by code, remove member, creator can't leave, delete group
-- [ ] Profile: avatar upload, bio, clear department
-- [ ] Admin: approve/reject file, approve faculty request, user search and pagination, can't demote self, announcements create/delete
-- [ ] Keyboard-only: tab through the login form, open and close a modal with Esc, use ⌘K search
-- [ ] 404 page for `/nope`
+- [x] Landing page: real stats, CTAs work, no layout shift
+- [x] Register (student), register (faculty request), OTP resend countdown, wrong OTP ×6 lockout
+- [x] Login, wrong password (no reload), forgot password end-to-end, change password logs out the other browser
+- [x] New tab stays logged in (B1); logout clears everything
+- [x] Dashboard for a student vs an admin
+- [x] Files: filters, sort, search, grid/list, upload with progress, preview PDF/image, save/unsave, my uploads with status, edit metadata, delete
+- [x] Chat: global + group, unread badges, load older, delete own message, linkified URLs, 2000-char limit, Enter vs Shift+Enter, disconnect/reconnect chip
+- [x] Groups: create public/private, invite code copy and join by code, remove member, creator can't leave, delete group
+- [x] Profile: avatar upload, bio, clear department
+- [x] Admin: approve/reject file, approve faculty request, user search and pagination, can't demote self, announcements create/delete
+- [x] Keyboard-only: tab through the login form, open and close a modal with Esc, use ⌘K search
+- [x] 404 page for `/nope`
 
 ---
 
@@ -525,9 +525,10 @@ Viewports: 375 px (phone), 768 px (tablet), 1280 px (laptop). Both themes.
 | 2026-11-20 | 8.1 | `npm test` in `backend/` (`node --test`, supertest, socket.io-client; needs `TEST_DATABASE_URI`, which `.env.example` documents and which must be the dev branch): **18 tests, all passing in ~19 s**. Covers every case listed in 8.1 plus: case-insensitive duplicate email, reset code rejected by verify-otp, identical forgot-password answers, group history 403 for outsiders, immediate-send-after-connect regression, member removal stops live delivery, students 403 on admin routes, role-request approval, password change signs out other sessions, search wildcard escaping. `server.js` exports `{ app, server, io }` and only auto-starts when run directly. Mail is captured by stubbing `utils/mailer`; users/groups created by tests are deleted afterwards. Rate limiting is off in tests. |
 | 2026-11-20 | 8.2 | `npm run build` and `npm run lint` pass with no warnings in the frontend. |
 | 2026-11-20 | BUG FIXED: chat message order | Found in manual QA: two messages sent ~400 ms apart were stored in reverse order (each insert took its timestamp from the DB when it ran, and concurrent inserts finish out of order on different pool connections). Then a regression test showed the live broadcast order could also scramble. Fix: stamp each message when it ARRIVES (stored and broadcast value are the same), and process each socket's sends through a per-socket queue. Regression test added (19 tests passing). |
+| 2026-11-20 | 8.3 manual QA (§11) | Run in the real browser against Vite + the backend on Neon dev, 375/768/1280 px, light and dark (layout checks), with the owner's local Cloudinary. Verified: landing real stats; student + faculty registration (strength hint, OTP boxes with paste, resend countdown, 5 wrong codes then the correct code is refused with "Too many attempts"); login/wrong password with no reload; forgot password end to end; change password signs out the other session; a NEW TAB stays signed in and a logout in one tab signs out the other; dashboard (student/admin); Files (filters, search, sort, grid/list persisted across reload, upload with progress, image + PDF + Word preview, save/unsave, My uploads status, edit, delete + Cloudinary removal); Chat (global, unread badge clears on open, load older keeps scroll, delete own, linkify, 2000-char counter, Enter vs Shift+Enter, disconnect/reconnect chip); Groups (create public/private, invite code, join by code, remove member, rotate code, owner has no Leave, delete); Profile (bio, clear department, avatar); Admin (approve/reject with preview, role request approve, user search/filter/menu with self protections, announcements create/delete); keyboard (logical tab order, no positive tabindex, Esc closes dialogs, Ctrl+K palette); 404 page. Clipboard "Copy" could not be exercised because the headless pane document is unfocused (browser blocks it); the app shows a fallback toast in that case. Bugs found by QA and fixed: message ordering (see above). |
 | 2026-11-20 | 0.2/0.3 | Neon branches created: `dev` (br-polished-union-aoj9t0mv), `backup-pre-v2` (br-round-frost-ao8u3kmu, no compute). |
 
 ## Progress summary (update at the end of each phase)
 
 - Phase 0: ☑  Phase 1: ◐ (code done, browser verify pending)  Phase 2: ☑ (CSP untested on Vercel)  Phase 3: ◐ (3.13 waits on 5.2)  Phase 4: ◐ (4.2 production UPDATE waits for 9.5)  Phase 5: ☑
-- Phase 6: ☑ (F13-F15 stretch not started)  Phase 7: ☐  Phase 8: ☐  Phase 9: ☐  Phase 10: ☐
+- Phase 6: ☑ (F13-F15 stretch not started)  Phase 7: ☐  Phase 8: ☑  Phase 9: ☐  Phase 10: ☐
