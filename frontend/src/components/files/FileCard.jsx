@@ -11,7 +11,7 @@ export default function FileCard({ file, view, canManage, showStatus, onPreview,
       <div className="fcard__top">
         <FileTypeIcon file={file} size="lg" />
         <div className="fcard__head">
-          <h3 className="fcard__title" title={file.title}>{file.title}</h3>
+          <h2 className="fcard__title" title={file.title}>{file.title}</h2>
           <p className="fcard__subject">{file.subject || FILE_TYPE_LABEL[file.file_type]}</p>
         </div>
       </div>

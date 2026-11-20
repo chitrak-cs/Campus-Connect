@@ -8,8 +8,9 @@ export const initials = (name = '') =>
 /** Image avatar, or initials on a color hashed from the name. size: xs | sm | md | lg | xl */
 export default function Avatar({ name = '', src, size = 'md', className = '' }) {
   return (
-    <span className={`ui-avatar ui-avatar--${size} ${className}`} style={src ? undefined : { background: PALETTE[hash(name) % PALETTE.length] }} aria-hidden="true">
-      {src ? <img src={src} alt="" loading="lazy" /> : initials(name)}
+    <span className={`ui-avatar ui-avatar--${size} ${className}`} style={src ? undefined : { background: PALETTE[hash(name) % PALETTE.length] }}
+      data-initials={src ? undefined : initials(name)} aria-hidden="true">
+      {src && <img src={src} alt="" loading="lazy" />}
     </span>
   )
 }
